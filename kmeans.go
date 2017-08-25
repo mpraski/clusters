@@ -1,7 +1,6 @@
 package clusters
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -10,7 +9,7 @@ import (
 )
 
 const (
-	CHANGES_THRESHOLD = 5
+	CHANGES_THRESHOLD = 2
 )
 
 type kmeansClusterer struct {
@@ -23,20 +22,23 @@ type kmeansClusterer struct {
 	distance DistanceFunc
 
 	// Mapping from training set points to cluster numbers.
-	clustered map[int]int
+	pc map[int]int
 
 	// Mapping from clusters' numbers to set of points they contain.
-	points map[int][]int
+	cp map[int][]int
+
+	// Mapping from clusters' numbers to their means
+	means map[int][]float64
 
 	// Training set
 	dataset [][]float64
 
 	// Computed clusters. Access is synchronized to accertain no incorrect predictions are made.
 	sync.RWMutex
-	clusters []*Cluster
+	clusters []HardCluster
 }
 
-func KmeansClusterer(iterations, clusters int, distance DistanceFunc) (Clusterer, error) {
+func KmeansClusterer(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
 	if iterations < 1 {
 		return nil, ErrZeroIterations
 	}
@@ -70,8 +72,9 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 
 	c.dataset = data
 
-	c.clustered = make(map[int]int, len(data))
-	c.points = make(map[int][]int, c.number)
+	c.pc = make(map[int]int, len(data))
+	c.cp = make(map[int][]int, c.number)
+	c.means = make(map[int][]float64, c.number)
 
 	c.counter = 0
 	c.threshold = CHANGES_THRESHOLD
@@ -80,7 +83,7 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 
 	c.initializeClusters()
 
-	for i := 0; i < c.iterations && c.shouldStop(); i++ {
+	for i := 0; i < c.iterations && c.notConverged(); i++ {
 		c.run()
 	}
 
@@ -93,14 +96,10 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 		go func(n int) {
 			defer wg.Done()
 
-			l := len(c.points[c.clusters[n].number])
+			c.clusters[n] = make([][]float64, len(c.cp[n]))
 
-			c.clusters[n].data = make([][]float64, l)
-
-			fmt.Printf("Cluster no. %02d centroid: %v\n", c.clusters[n].number, c.clusters[n].mean)
-
-			for k := 0; k < l; k++ {
-				c.clusters[n].data[k] = c.dataset[c.points[c.clusters[n].number][k]]
+			for k := 0; k < len(c.cp[n]); k++ {
+				c.clusters[n][k] = c.dataset[c.cp[n][k]]
 			}
 		}(j)
 	}
@@ -109,13 +108,13 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 
 	c.Unlock()
 
-	c.clustered = map[int]int{}
-	c.points = map[int][]int{}
+	c.pc = map[int]int{}
+	c.cp = map[int][]int{}
 
 	return nil
 }
 
-func (c *kmeansClusterer) Compute() ([]*Cluster, error) {
+func (c *kmeansClusterer) Clusters() ([]HardCluster, error) {
 	c.RLock()
 	defer c.RUnlock()
 
@@ -126,12 +125,12 @@ func (c *kmeansClusterer) Compute() ([]*Cluster, error) {
 	return c.clusters, nil
 }
 
-func (c *kmeansClusterer) Predict(p []float64) (*Cluster, error) {
+func (c *kmeansClusterer) Predict(p []float64) (HardCluster, error) {
 	c.RLock()
 	defer c.RUnlock()
 
 	if c.clusters == nil {
-		return nil, ErrEmptyClusters
+		return HardCluster{}, ErrEmptyClusters
 	}
 
 	var (
@@ -141,7 +140,7 @@ func (c *kmeansClusterer) Predict(p []float64) (*Cluster, error) {
 	)
 
 	for i := 0; i < len(c.clusters); i++ {
-		if d = c.distance(p, c.clusters[i].mean); d < m {
+		if d = c.distance(p, c.means[i]); d < m {
 			m = d
 			l = i
 		}
@@ -150,18 +149,9 @@ func (c *kmeansClusterer) Predict(p []float64) (*Cluster, error) {
 	return c.clusters[l], nil
 }
 
-func (c *kmeansClusterer) PredictFunc() PredictFunc {
-	c.RLock()
-	defer c.RUnlock()
-
-	return func(p []float64) (*Cluster, error) {
-		return c.Predict(p)
-	}
-}
-
-func (c *kmeansClusterer) Online(observations chan []float64, done chan bool) chan []*Cluster {
+func (c *kmeansClusterer) Online(observations chan []float64, done chan bool) chan []HardCluster {
 	var (
-		r = make(chan []*Cluster)
+		r = make(chan []HardCluster)
 	)
 
 	go func() {
@@ -179,33 +169,29 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan bool) ch
 
 // private
 func (c *kmeansClusterer) initializeClusters() {
-	c.clusters = make([]*Cluster, c.number)
+	c.clusters = make([]HardCluster, c.number)
 
 	for i := 0; i < c.number; i++ {
-		c.clusters[i] = &Cluster{
-			number: i,
-			mean:   c.dataset[rand.Intn(len(c.dataset)-1)],
-		}
+		c.means[i] = c.dataset[rand.Intn(len(c.dataset)-1)]
 	}
 }
 
 func (c *kmeansClusterer) run() error {
 	for i := 0; i < len(c.clusters); i++ {
-		var l = len(c.points[c.clusters[i].number])
-
+		var l = len(c.cp[i])
 		if l == 0 {
 			continue
 		}
 
 		var m = make([]float64, len(c.dataset[0]))
 		for j := 0; j < l; j++ {
-			floats.Add(m, c.dataset[c.points[c.clusters[i].number][j]])
+			floats.Add(m, c.dataset[c.cp[i][j]])
 		}
 
 		floats.Scale(1/float64(l), m)
 
-		c.clusters[i].mean = m
-		c.points[c.clusters[i].number] = []int{}
+		c.means[i] = m
+		c.cp[i] = []int{}
 	}
 
 	for i := 0; i < len(c.dataset); i++ {
@@ -216,13 +202,13 @@ func (c *kmeansClusterer) run() error {
 		)
 
 		for j := 0; j < len(c.clusters); j++ {
-			if d = c.distance(c.dataset[i], c.clusters[j].mean); d < m {
+			if d = c.distance(c.dataset[i], c.means[j]); d < m {
 				m = d
-				n = c.clusters[j].number
+				n = j
 			}
 		}
 
-		if v, ok := c.clustered[i]; ok {
+		if v, ok := c.pc[i]; ok {
 			if v != n {
 				c.changes++
 			}
@@ -230,14 +216,14 @@ func (c *kmeansClusterer) run() error {
 			c.changes++
 		}
 
-		c.clustered[i] = n
-		c.points[n] = append(c.points[n], i)
+		c.pc[i] = n
+		c.cp[n] = append(c.cp[n], i)
 	}
 
 	return nil
 }
 
-func (c *kmeansClusterer) shouldStop() bool {
+func (c *kmeansClusterer) notConverged() bool {
 	if c.counter == c.threshold {
 		return false
 	}

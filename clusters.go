@@ -4,38 +4,39 @@ import (
 	"gonum.org/v1/gonum/floats"
 )
 
-type PredictFunc func(observation []float64) (*Cluster, error)
-
 type DistanceFunc func(a, b []float64) float64
 
-type Cluster struct {
-	number int
-	mean   []float64
-	data   [][]float64
-}
+type HardCluster [][]float64
 
-func (c *Cluster) Number() int {
-	return c.number
-}
-
-func (c *Cluster) Size() int {
-	return len(c.data)
-}
-
-func (c *Cluster) Data() [][]float64 {
-	return c.data
+type SoftCluster struct {
+	sizes []int
+	data  []struct {
+		probabilities, observation []float64
+	}
 }
 
 type Clusterer interface {
 	Learn(data [][]float64) error
+}
 
-	Predict(observation []float64) (*Cluster, error)
+type HardClusterer interface {
+	Clusters() ([]HardCluster, error)
 
-	PredictFunc() PredictFunc
+	Predict(observation []float64) (HardCluster, error)
 
-	Compute() ([]*Cluster, error)
+	Online(observations chan []float64, done chan bool) chan []HardCluster
 
-	Online(observations chan []float64, done chan bool) chan []*Cluster
+	Clusterer
+}
+
+type SoftClusterer interface {
+	Clusters() ([]*SoftCluster, error)
+
+	Predict(observation []float64) (*SoftCluster, error)
+
+	Online(observations chan []float64, done chan bool) chan []*SoftCluster
+
+	Clusterer
 }
 
 var (
