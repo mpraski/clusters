@@ -95,12 +95,12 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 
 			l := len(c.points[c.clusters[n].number])
 
-			c.clusters[n].data = make([][]float64, 0, l)
+			c.clusters[n].data = make([][]float64, l)
 
 			fmt.Printf("Cluster no. %02d centroid: %v\n", c.clusters[n].number, c.clusters[n].mean)
 
 			for k := 0; k < l; k++ {
-				c.clusters[n].data = append(c.clusters[n].data, c.dataset[c.points[c.clusters[n].number][k]])
+				c.clusters[n].data[k] = c.dataset[c.points[c.clusters[n].number][k]]
 			}
 		}(j)
 	}
@@ -179,13 +179,13 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan bool) ch
 
 // private
 func (c *kmeansClusterer) initializeClusters() {
-	c.clusters = make([]*Cluster, 0, c.number)
+	c.clusters = make([]*Cluster, c.number)
 
 	for i := 0; i < c.number; i++ {
-		c.clusters = append(c.clusters, &Cluster{
+		c.clusters[i] = &Cluster{
 			number: i,
 			mean:   c.dataset[rand.Intn(len(c.dataset)-1)],
-		})
+		}
 	}
 }
 
