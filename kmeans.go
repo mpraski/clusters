@@ -54,8 +54,8 @@ func KmeansClusterer(iterations, clusters int, distance DistanceFunc, online ...
 		return nil, ErrZeroIterations
 	}
 
-	if clusters < 1 {
-		return nil, ErrZeroClusters
+	if clusters < 2 {
+		return nil, ErrOneCluster
 	}
 
 	var d DistanceFunc
