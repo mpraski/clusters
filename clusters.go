@@ -27,11 +27,11 @@ type Clusterer interface {
 type HardClusterer interface {
 	Guesses() []HardCluster
 
-	Predict(observation []float64) (HardCluster, error)
+	Predict(observation []float64) HardCluster
 
-	Online(observations chan []float64, done chan struct{}) chan int
+	Online(observations chan []float64, done chan struct{}, callback func([]float64, int))
 
-	WithOnline(params Online) HardClusterer
+	WithOnline(Online) HardClusterer
 
 	Clusterer
 }
@@ -39,11 +39,11 @@ type HardClusterer interface {
 type SoftClusterer interface {
 	Guesses() []*SoftCluster
 
-	Predict(observation []float64) (*SoftCluster, error)
+	Predict(observation []float64) *SoftCluster
 
-	Online(observations chan []float64, done chan struct{}) chan int
+	Online(observations chan []float64, done chan struct{}, callback func())
 
-	WithOnline(params Online) SoftClusterer
+	WithOnline(Online) SoftClusterer
 
 	Clusterer
 }

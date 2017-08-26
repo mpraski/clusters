@@ -4,7 +4,6 @@ import (
 	"math"
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"gonum.org/v1/gonum/floats"
@@ -41,7 +40,7 @@ type kmeansClusterer struct {
 	// Training set
 	d [][]float64
 
-	// Computed clusters. Access is synchronized to accertain no incorrect predictions are made.
+	// Computed clusters. Access is synchronized.
 	mu sync.RWMutex
 	c  []HardCluster
 }
@@ -74,6 +73,10 @@ func KmeansClusterer(iterations, clusters int, distance DistanceFunc) (HardClust
 func (c *kmeansClusterer) WithOnline(o Online) HardClusterer {
 	c.alpha = o.Alpha
 	c.dimension = o.Dimension
+
+	c.d = make([][]float64, 0, 100)
+
+	c.initializeMeans()
 
 	return c
 }
@@ -135,10 +138,7 @@ func (c *kmeansClusterer) Guesses() []HardCluster {
 	return c.c
 }
 
-func (c *kmeansClusterer) Predict(p []float64) (HardCluster, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
+func (c *kmeansClusterer) Predict(p []float64) HardCluster {
 	var (
 		l HardCluster
 		d float64
@@ -152,32 +152,30 @@ func (c *kmeansClusterer) Predict(p []float64) (HardCluster, error) {
 		}
 	}
 
-	return l, nil
+	return l
 }
 
-func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}) chan int {
-	if c.alpha == 0 || c.dimension == 0 {
-		return nil
-	}
-
-	c.d = make([][]float64, 0, 100)
-
-	c.initializeMeans()
+func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}, callback func([]float64, int)) {
+	c.mu.Lock()
 
 	var (
-		r        chan int  = make(chan int)
-		b        []float64 = make([]float64, len(c.m[0]))
-		k, l, f  int       = 0, len(c.m), len(c.m[0])
-		m, n, am float64   = 0, 0, 1 - c.alpha
-		s        uint32
+		l, f int     = len(c.m), len(c.m[0])
+		h    float64 = 1 - c.alpha
 	)
+
+	/* The first step of online learning is adjusting the centroids by finding the one closes to new data point
+	 * and modifying it's location using given alpha. Once the client quits sending new data, the actual clusters
+	 * are computed and the mutex is unlocked. */
 
 	go func() {
 		for {
 			select {
 			case o := <-observations:
-				m = squaredDistance(o, c.m[0])
-				k = 0
+				var (
+					k int
+					n float64
+					m float64 = squaredDistance(o, c.m[0])
+				)
 
 				for i := 1; i < l; i++ {
 					if n = squaredDistance(o, c.m[i]); n < m {
@@ -186,60 +184,46 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 					}
 				}
 
-				for i := 0; i < f; i++ {
-					b[i] = c.m[k][i]
-				}
+				go callback(o, k)
 
 				for i := 0; i < f; i++ {
-					c.m[k][i] = c.alpha*o[i] + am*c.m[k][i]
+					c.m[k][i] = c.alpha*o[i] + h*c.m[k][i]
 				}
 
-				r <- k
-
-				/* Only trigger update if change of a centroid was
-				 * siginificant and goroutine limit is not reached
-				 */
-				if atomic.LoadUint32(&s) < GOROUTINE_THRESHOLD && !floats.EqualApprox(b, c.m[k], MEAN_THRESHOLD) {
-					go func(p []float64) {
-						c.mu.Lock()
-						atomic.AddUint32(&s, 1)
-
-						var (
-							n    int
-							d, m float64
-						)
-
-						c.d = append(c.d, p)
-
-						for i := 0; i < c.number; i++ {
-							c.c[i] = c.c[i][:0]
-						}
-
-						for i := 0; i < len(c.d); i++ {
-							m = c.distance(c.d[i], c.m[0])
-							n = 0
-
-							for j := 1; j < c.number; j++ {
-								if d = c.distance(c.d[i], c.m[j]); d < m {
-									m = d
-									n = j
-								}
-							}
-
-							c.c[n] = append(c.c[n], c.d[i])
-						}
-
-						atomic.AddUint32(&s, ^uint32(0))
-						c.mu.Unlock()
-					}(o)
-				}
+				c.d = append(c.d, o)
 			case <-done:
+				go func() {
+					var (
+						n    int
+						l    int = len(c.d) / c.number
+						d, m float64
+					)
+
+					for i := 0; i < c.number; i++ {
+						c.c[n] = make([][]float64, 0, l)
+					}
+
+					for i := 0; i < len(c.d); i++ {
+						m = c.distance(c.d[i], c.m[0])
+						n = 0
+
+						for j := 1; j < c.number; j++ {
+							if d = c.distance(c.d[i], c.m[j]); d < m {
+								m = d
+								n = j
+							}
+						}
+
+						c.c[n] = append(c.c[n], c.d[i])
+					}
+
+					c.mu.Unlock()
+				}()
+
 				return
 			}
 		}
 	}()
-
-	return r
 }
 
 // private
