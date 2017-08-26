@@ -4,20 +4,17 @@ import (
 	"math"
 	"math/rand"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"gonum.org/v1/gonum/floats"
 )
 
 const (
-	CHANGES_THRESHOLD = 2
-	MEAN_THRESHOLD    = 0.05
+	CHANGES_THRESHOLD   = 2
+	GOROUTINE_THRESHOLD = 2
+	MEAN_THRESHOLD      = 0.05
 )
-
-type Online struct {
-	alpha     float64
-	dimension int
-}
 
 type kmeansClusterer struct {
 	iterations int
@@ -49,7 +46,7 @@ type kmeansClusterer struct {
 	c  []HardCluster
 }
 
-func KmeansClusterer(iterations, clusters int, distance DistanceFunc, online ...Online) (HardClusterer, error) {
+func KmeansClusterer(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
 	if iterations < 1 {
 		return nil, ErrZeroIterations
 	}
@@ -67,21 +64,18 @@ func KmeansClusterer(iterations, clusters int, distance DistanceFunc, online ...
 		}
 	}
 
-	var o Online
-	{
-		if len(online) > 0 {
-			o = online[0]
-		}
-	}
-
 	return &kmeansClusterer{
 		iterations: iterations,
 		number:     clusters,
 		distance:   d,
-
-		alpha:     o.alpha,
-		dimension: o.dimension,
 	}, nil
+}
+
+func (c *kmeansClusterer) WithOnline(o Online) HardClusterer {
+	c.alpha = o.Alpha
+	c.dimension = o.Dimension
+
+	return c
 }
 
 func (c *kmeansClusterer) Learn(data [][]float64) error {
@@ -161,17 +155,21 @@ func (c *kmeansClusterer) Predict(p []float64) (HardCluster, error) {
 	return l, nil
 }
 
-func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}) chan []HardCluster {
+func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}) chan int {
+	if c.alpha == 0 || c.dimension == 0 {
+		return nil
+	}
+
 	c.d = make([][]float64, 0, 100)
 
 	c.initializeMeans()
 
 	var (
-		w        sync.WaitGroup
-		r        chan []HardCluster = make(chan []HardCluster)
-		b        []float64          = make([]float64, len(c.m[0]))
-		k, l, f  int                = 0, len(c.m), len(c.m[0])
-		m, n, am float64            = 0, 0, 1 - c.alpha
+		r        chan int  = make(chan int)
+		b        []float64 = make([]float64, len(c.m[0]))
+		k, l, f  int       = 0, len(c.m), len(c.m[0])
+		m, n, am float64   = 0, 0, 1 - c.alpha
+		s        uint32
 	)
 
 	go func() {
@@ -182,7 +180,7 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 				k = 0
 
 				for i := 1; i < l; i++ {
-					if n = squaredDistance(o, c.m[1]); n < m {
+					if n = squaredDistance(o, c.m[i]); n < m {
 						m = n
 						k = i
 					}
@@ -196,48 +194,44 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 					c.m[k][i] = c.alpha*o[i] + am*c.m[k][i]
 				}
 
-				// Only trigger update if change of a centroid was siginificant, else send unchanged set
-				if !floats.EqualApprox(b, c.m[k], MEAN_THRESHOLD) {
-					go func(data [][]float64, p []float64) {
-						w.Wait()
+				r <- k
 
-						w.Add(1)
-
+				/* Only trigger update if change of a centroid was
+				 * siginificant and goroutine limit is not reached
+				 */
+				if atomic.LoadUint32(&s) < GOROUTINE_THRESHOLD && !floats.EqualApprox(b, c.m[k], MEAN_THRESHOLD) {
+					go func(p []float64) {
 						c.mu.Lock()
+						atomic.AddUint32(&s, 1)
 
 						var (
 							n    int
 							d, m float64
 						)
 
-						data = append(data, p)
+						c.d = append(c.d, p)
 
 						for i := 0; i < c.number; i++ {
 							c.c[i] = c.c[i][:0]
 						}
 
-						for i := 0; i < len(data); i++ {
-							m = c.distance(data[i], c.m[0])
+						for i := 0; i < len(c.d); i++ {
+							m = c.distance(c.d[i], c.m[0])
 							n = 0
 
 							for j := 1; j < c.number; j++ {
-								if d = c.distance(data[i], c.m[j]); d < m {
+								if d = c.distance(c.d[i], c.m[j]); d < m {
 									m = d
 									n = j
 								}
 							}
 
-							c.c[n] = append(c.c[n], data[i])
+							c.c[n] = append(c.c[n], c.d[i])
 						}
 
+						atomic.AddUint32(&s, ^uint32(0))
 						c.mu.Unlock()
-
-						w.Done()
-
-						r <- c.c
-					}(c.d, o)
-				} else {
-					r <- c.c
+					}(o)
 				}
 			case <-done:
 				return
@@ -266,7 +260,7 @@ func (c *kmeansClusterer) initializeMeans() {
 
 	for i := 0; i < c.number; i++ {
 		c.m[i] = make([]float64, c.dimension)
-		for j := 0; j < c.dimension; i++ {
+		for j := 0; j < c.dimension; j++ {
 			c.m[i][j] = 10 * (rand.Float64() - 0.5)
 		}
 	}

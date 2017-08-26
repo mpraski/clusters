@@ -6,6 +6,11 @@ import (
 
 type DistanceFunc func(a, b []float64) float64
 
+type Online struct {
+	Alpha     float64
+	Dimension int
+}
+
 type HardCluster [][]float64
 
 type SoftCluster struct {
@@ -24,7 +29,9 @@ type HardClusterer interface {
 
 	Predict(observation []float64) (HardCluster, error)
 
-	Online(observations chan []float64, done chan struct{}) chan []HardCluster
+	Online(observations chan []float64, done chan struct{}) chan int
+
+	WithOnline(params Online) HardClusterer
 
 	Clusterer
 }
@@ -34,7 +41,9 @@ type SoftClusterer interface {
 
 	Predict(observation []float64) (*SoftCluster, error)
 
-	Online(observations chan []float64, done chan struct{}) chan []*SoftCluster
+	Online(observations chan []float64, done chan struct{}) chan int
+
+	WithOnline(params Online) SoftClusterer
 
 	Clusterer
 }
