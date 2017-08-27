@@ -1,9 +1,10 @@
 package clusters
 
+import (
+	"gonum.org/v1/gonum/floats"
+	"math"
+)
+
 func squaredDistance(a, b []float64) float64 {
-	var s float64
-	for i := range a {
-		s += (a[i] - b[i]) * (a[i] - b[i])
-	}
-	return s
+	return math.Pow(floats.Distance(a, b, 2), 2)
 }

@@ -231,9 +231,41 @@ func (c *kmeansClusterer) initializeMeansWithData() {
 	c.m = make([][]float64, c.number)
 	c.c = make([]HardCluster, c.number)
 
-	for i := 0; i < c.number; i++ {
-		c.m[i] = c.d[rand.Intn(len(c.d)-1)]
+	rand.Seed(time.Now().UTC().Unix())
+
+	var (
+		k          int
+		s, t, l, f float64
+		d          []float64 = make([]float64, len(c.d))
+	)
+
+	c.m[0] = c.d[rand.Intn(len(c.d)-1)]
+
+	for i := 1; i < c.number; i++ {
+		s = 0
+		t = 0
+		for j := 0; j < len(c.d); j++ {
+
+			l = c.distance(c.m[0], c.d[j])
+			for g := 1; g < i; g++ {
+				if f = c.distance(c.m[g], c.d[j]); f < l {
+					l = f
+				}
+			}
+
+			d[j] = math.Pow(l, 2)
+			s += d[j]
+		}
+
+		t = rand.Float64() * s
+		k = 0
+		for s = d[0]; s < t; s += d[k] {
+			k++
+		}
+
+		c.m[i] = c.d[k]
 	}
+
 }
 
 func (c *kmeansClusterer) initializeMeans() {
