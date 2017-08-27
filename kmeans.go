@@ -172,7 +172,7 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 				var (
 					k int
 					n float64
-					m float64 = math.pow(c.distance(o, c.m[0]), 2)
+					m float64 = math.Pow(c.distance(o, c.m[0]), 2)
 				)
 
 				for i := 1; i < l; i++ {
