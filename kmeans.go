@@ -10,9 +10,7 @@ import (
 )
 
 const (
-	CHANGES_THRESHOLD   = 2
-	GOROUTINE_THRESHOLD = 2
-	MEAN_THRESHOLD      = 0.05
+	CHANGES_THRESHOLD = 2
 )
 
 type kmeansClusterer struct {
@@ -174,11 +172,11 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 				var (
 					k int
 					n float64
-					m float64 = squaredDistance(o, c.m[0])
+					m float64 = c.distance(o, c.m[0])
 				)
 
 				for i := 1; i < l; i++ {
-					if n = squaredDistance(o, c.m[i]); n < m {
+					if n = c.distance(o, c.m[i]); n < m {
 						m = n
 						k = i
 					}
