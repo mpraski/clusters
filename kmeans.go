@@ -16,31 +16,24 @@ const (
 type kmeansClusterer struct {
 	iterations int
 	number     int
-	dimension  int
 
 	// Variables keeping count of changes of points' membership every iteration. User as a stopping condition.
 	changes, oldchanges, counter, threshold int
 
 	// For online learning only
-	alpha float64
+	alpha     float64
+	dimension int
 
 	distance DistanceFunc
 
-	// Mapping from training set points to clusters' numbers.
-	a map[int]int
+	// a holds the mapping of data point indices to cluster numbers, b holds the sizes of each cluster
+	mu   sync.RWMutex
+	a, b []int
 
-	// Mapping from clusters' numbers to set of points they contain.
-	b [][]int
+	// variables holding values of centroids of each clusters
+	m, n [][]float64
 
-	// Mapping from clusters' numbers to their means
-	m [][]float64
-
-	// Training set
 	d [][]float64
-
-	// Computed clusters. Access is synchronized.
-	mu sync.RWMutex
-	c  []HardCluster
 }
 
 func KmeansClusterer(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
@@ -88,8 +81,12 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 
 	c.d = data
 
-	c.a = make(map[int]int, len(data))
-	c.b = make([][]int, c.number)
+	c.a = make([]int, len(data))
+	c.b = make([]int, c.number)
+
+	for i := 0; i < len(data); i++ {
+		c.a[i] = -1
+	}
 
 	c.counter = 0
 	c.threshold = CHANGES_THRESHOLD
@@ -98,68 +95,59 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 
 	c.initializeMeansWithData()
 
-	for i := 0; i < c.iterations && c.notConverged(); i++ {
+	for i := 0; i < c.iterations && c.counter != c.threshold; i++ {
 		c.run()
+		c.check()
 	}
-
-	var wg sync.WaitGroup
-	{
-		wg.Add(c.number)
-	}
-
-	for j := 0; j < c.number; j++ {
-		go func(n int) {
-			defer wg.Done()
-
-			c.c[n] = make([][]float64, len(c.b[n]))
-
-			for k := 0; k < len(c.b[n]); k++ {
-				c.c[n][k] = c.d[c.b[n][k]]
-			}
-		}(j)
-	}
-
-	wg.Wait()
 
 	c.mu.Unlock()
 
-	c.a = nil
-	c.b = nil
+	c.n = nil
 
 	return nil
 }
 
-func (c *kmeansClusterer) Guesses() []HardCluster {
+func (c *kmeansClusterer) Sizes() []int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	return c.c
+	return c.b
 }
 
-func (c *kmeansClusterer) Predict(p []float64) HardCluster {
+func (c *kmeansClusterer) Guesses() []int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.a
+}
+
+func (c *kmeansClusterer) Predict(p []float64) int {
 	var (
-		l HardCluster
+		l int
 		d float64
-		m float64 = math.MaxFloat64
+		m float64 = c.distance(p, c.m[0])
 	)
 
-	for i := 0; i < len(c.c); i++ {
+	for i := 1; i < c.number; i++ {
 		if d = c.distance(p, c.m[i]); d < m {
 			m = d
-			l = c.c[i]
+			l = i
 		}
 	}
 
 	return l
 }
 
-func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}, callback func([]float64, int)) {
+func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}) chan *HCEvent {
 	c.mu.Lock()
 
 	var (
-		l, f int     = len(c.m), len(c.m[0])
-		h    float64 = 1 - c.alpha
+		r    chan *HCEvent = make(chan *HCEvent)
+		l, f int           = len(c.m), len(c.m[0])
+		h    float64       = 1 - c.alpha
 	)
+
+	c.b = make([]int, c.number)
 
 	/* The first step of online learning is adjusting the centroids by finding the one closes to new data point
 	 * and modifying it's location using given alpha. Once the client quits sending new data, the actual clusters
@@ -182,7 +170,10 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 					}
 				}
 
-				go callback(o, k)
+				r <- &HCEvent{
+					Cluster:     k,
+					Observation: o,
+				}
 
 				for i := 0; i < f; i++ {
 					c.m[k][i] = c.alpha*o[i] + h*c.m[k][i]
@@ -193,13 +184,10 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 				go func() {
 					var (
 						n    int
-						l    int = len(c.d) / c.number
 						d, m float64
 					)
 
-					for i := 0; i < c.number; i++ {
-						c.c[n] = make([][]float64, 0, l)
-					}
+					c.a = make([]int, len(c.d))
 
 					for i := 0; i < len(c.d); i++ {
 						m = c.distance(c.d[i], c.m[0])
@@ -212,7 +200,8 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 							}
 						}
 
-						c.c[n] = append(c.c[n], c.d[i])
+						c.a[i] = n
+						c.b[n]++
 					}
 
 					c.mu.Unlock()
@@ -222,12 +211,14 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 			}
 		}
 	}()
+
+	return r
 }
 
 // private
 func (c *kmeansClusterer) initializeMeansWithData() {
 	c.m = make([][]float64, c.number)
-	c.c = make([]HardCluster, c.number)
+	c.n = make([][]float64, c.number)
 
 	rand.Seed(time.Now().UTC().Unix())
 
@@ -264,11 +255,13 @@ func (c *kmeansClusterer) initializeMeansWithData() {
 		c.m[i] = c.d[k]
 	}
 
+	for i := 0; i < c.number; i++ {
+		c.n[i] = make([]float64, len(c.m[0]))
+	}
 }
 
 func (c *kmeansClusterer) initializeMeans() {
 	c.m = make([][]float64, c.number)
-	c.c = make([]HardCluster, c.number)
 
 	rand.Seed(time.Now().UTC().Unix())
 
@@ -282,56 +275,49 @@ func (c *kmeansClusterer) initializeMeans() {
 
 func (c *kmeansClusterer) run() {
 	var (
-		l, n int
+		n, l int = 0, len(c.m[0])
 		d, m float64
 	)
 
-	for i := 0; i < len(c.c); i++ {
-		if l = len(c.b[i]); l == 0 {
-			continue
-		}
-
-		c.m[i] = make([]float64, len(c.d[0]))
-
-		for j := 0; j < l; j++ {
-			floats.Add(c.m[i], c.d[c.b[i][j]])
-		}
-
-		floats.Scale(1/float64(l), c.m[i])
-
-		c.b[i] = c.b[i][:0]
+	for i := 0; i < c.number; i++ {
+		c.b[i] = 0
 	}
 
 	for i := 0; i < len(c.d); i++ {
 		m = c.distance(c.d[i], c.m[0])
 		n = 0
 
-		for j := 1; j < len(c.c); j++ {
+		for j := 1; j < c.number; j++ {
 			if d = c.distance(c.d[i], c.m[j]); d < m {
 				m = d
 				n = j
 			}
 		}
 
-		if v, ok := c.a[i]; ok && v != n {
+		if c.a[i] != n {
 			c.changes++
 		}
 
 		c.a[i] = n
-		c.b[n] = append(c.b[n], i)
+		c.b[n]++
+
+		floats.Add(c.n[n], c.d[i])
+	}
+
+	for i := 0; i < c.number; i++ {
+		floats.Scale(1/float64(c.b[i]), c.n[i])
+
+		for j := 0; j < l; j++ {
+			c.m[i][j] = c.n[i][j]
+			c.n[i][j] = 0
+		}
 	}
 }
 
-func (c *kmeansClusterer) notConverged() bool {
-	if c.counter == c.threshold {
-		return false
-	}
-
+func (c *kmeansClusterer) check() {
 	if c.changes == c.oldchanges {
 		c.counter++
 	}
 
 	c.oldchanges = c.changes
-
-	return true
 }

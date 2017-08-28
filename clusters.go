@@ -11,38 +11,60 @@ type Online struct {
 	Dimension int
 }
 
-type HardCluster [][]float64
-
-type SoftCluster struct {
-	sizes []int
-	data  []struct {
-		probabilities, observation []float64
-	}
+/* Events represent intermediate results of computation of both kinds of algorithms
+ * transmitted periodically to the caller */
+type HCEvent struct {
+	Cluster     int
+	Observation []float64
 }
 
+type SCEvent struct {
+	Probabilities []float64
+	Observation   []float64
+}
+
+/* Clusterer denotes a single operation of learning
+ * common for both Hard and Soft clusterers */
 type Clusterer interface {
 	Learn(data [][]float64) error
 }
 
+/* HardClusterer defines a set of operations for hard clustering algorithms */
 type HardClusterer interface {
-	Guesses() []HardCluster
 
-	Predict(observation []float64) HardCluster
+	/* Returns sizes of respective clusters */
+	Sizes() []int
 
-	Online(observations chan []float64, done chan struct{}, callback func([]float64, int))
+	/* Returns mapping from data point indices to cluster index */
+	Guesses() []int
 
+	/* Returns index of cluster to which the observation was assigned */
+	Predict(observation []float64) int
+
+	/* Provides a method to train the algorithm online and receive intermediate results of computation */
+	Online(observations chan []float64, done chan struct{}) chan *HCEvent
+
+	/* Allows to configure the algorithms for online learning */
 	WithOnline(Online) HardClusterer
 
 	Clusterer
 }
 
 type SoftClusterer interface {
-	Guesses() []*SoftCluster
 
-	Predict(observation []float64) *SoftCluster
+	/* Returns average probabilities of respective clusters */
+	Probabilities() []float64
 
-	Online(observations chan []float64, done chan struct{}, callback func())
+	/* Returns mapping from data point indices to cluster probabilities */
+	Guesses() [][]float64
 
+	/* Returns probabilities of the observation being assigned to respective clusters */
+	Predict(observation []float64) []float64
+
+	/* Provides a method to train the algorithm online and receive intermediate results of computation */
+	Online(observations chan []float64, done chan struct{}) chan *SCEvent
+
+	/* Allows to configure the algorithms for online learning */
 	WithOnline(Online) SoftClusterer
 
 	Clusterer
