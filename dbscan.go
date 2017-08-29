@@ -10,14 +10,19 @@ type dbscanClusterer struct {
 
 	l, s, o, f int
 
-	// For online learning only
-	alpha     float64
-	dimension int
-
 	distance DistanceFunc
 
 	mu   sync.RWMutex
 	a, b []int
+
+	// channel for distributed searching for nearest neighbours
+	j chan *nearestJob
+
+	// variabes for calculating nearest neighbours concurrently
+	m *sync.Mutex
+	w *sync.WaitGroup
+	p *[]float64
+	r *[]int
 
 	// visited points
 	v []bool
@@ -25,7 +30,20 @@ type dbscanClusterer struct {
 	d [][]float64
 }
 
+type nearestJob struct {
+	a, b int
+}
+
+/* Implementation of DBSCAN algorithm with concurrent moditication */
 func DbscanClusterer(minpts int, eps float64, distance DistanceFunc) (HardClusterer, error) {
+	if minpts < 1 {
+		return nil, ErrZeroMinpts
+	}
+
+	if eps <= 0 {
+		return nil, ErrZeroEpsilon
+	}
+
 	var d DistanceFunc
 	{
 		if distance != nil {
@@ -42,12 +60,11 @@ func DbscanClusterer(minpts int, eps float64, distance DistanceFunc) (HardCluste
 	}, nil
 }
 
+func (c *dbscanClusterer) IsOnline() bool {
+	return false
+}
+
 func (c *dbscanClusterer) WithOnline(o Online) HardClusterer {
-	c.alpha = o.Alpha
-	c.dimension = o.Dimension
-
-	c.d = make([][]float64, 0, 100)
-
 	return c
 }
 
@@ -59,7 +76,7 @@ func (c *dbscanClusterer) Learn(data [][]float64) error {
 	c.mu.Lock()
 
 	c.l = len(data)
-	c.s = numGoroutines(c.l)
+	c.s = numWorkers(c.l)
 	c.o = c.s - 1
 	c.f = c.l / c.s
 
@@ -70,9 +87,17 @@ func (c *dbscanClusterer) Learn(data [][]float64) error {
 	c.a = make([]int, c.l)
 	c.b = make([]int, 0)
 
+	c.startWorkers()
+
 	c.run()
 
+	c.endWorkers()
+
 	c.v = nil
+	c.m = nil
+	c.w = nil
+	c.p = nil
+	c.r = nil
 
 	c.mu.Unlock()
 
@@ -111,30 +136,10 @@ func (c *dbscanClusterer) Predict(p []float64) int {
 }
 
 func (c *dbscanClusterer) Online(observations chan []float64, done chan struct{}) chan *HCEvent {
-	c.mu.Lock()
-
-	var (
-		r chan *HCEvent = make(chan *HCEvent)
-	)
-
-	go func() {
-		for {
-			select {
-			case o := <-observations:
-				c.d = append(c.d, o)
-			case <-done:
-				go func() {
-					c.mu.Unlock()
-				}()
-
-				return
-			}
-		}
-	}()
-
-	return r
+	return nil
 }
 
+// private
 func (c *dbscanClusterer) run() {
 	var (
 		n, m, l, k = 1, 0, 0, 0
@@ -148,7 +153,7 @@ func (c *dbscanClusterer) run() {
 
 		c.v[i] = true
 
-		c.nearest(i, &l, &ns)
+		c.nearest(&i, &l, &ns)
 
 		if l < c.minpts {
 			c.a[i] = -1
@@ -162,7 +167,7 @@ func (c *dbscanClusterer) run() {
 				if !c.v[ns[j]] {
 					c.v[ns[j]] = true
 
-					c.nearest(ns[j], &k, &nss)
+					c.nearest(&ns[j], &k, &nss)
 
 					if k >= c.minpts {
 						l += k
@@ -182,18 +187,21 @@ func (c *dbscanClusterer) run() {
 	}
 }
 
-func (c *dbscanClusterer) nearest(p int, l *int, r *[]int) {
-	var (
-		m sync.Mutex
-		w sync.WaitGroup
-
-		b int
-		v []float64 = c.d[p]
-	)
+/* Divide work among c.s workers, where c.s is determined
+ * by the size of the data. This is based on an assumption that neighbour points of p
+ * are located in relatively small subsection of the input data, so the dataset can be scanned
+ * concurrently without blocking a big number of goroutines trying to write to r */
+func (c *dbscanClusterer) nearest(p *int, l *int, r *[]int) {
+	var b int
 
 	*r = (*r)[:0]
 
-	w.Add(c.s)
+	c.m = &sync.Mutex{}
+	c.w = &sync.WaitGroup{}
+	c.p = &c.d[*p]
+	c.r = r
+
+	c.w.Add(c.s)
 
 	for i := 0; i < c.s; i++ {
 		if i == c.o {
@@ -202,25 +210,44 @@ func (c *dbscanClusterer) nearest(p int, l *int, r *[]int) {
 			b = (i + 1) * c.f
 		}
 
-		go func(a, b int) {
-			for j := a; j < b; j++ {
-				if c.distance(v, c.d[j]) < c.eps {
-					m.Lock()
-					*r = append(*r, j)
-					m.Unlock()
-				}
-			}
-
-			w.Done()
-		}(i*c.f, b)
+		c.j <- &nearestJob{
+			a: i * c.f,
+			b: b,
+		}
 	}
 
-	w.Wait()
+	c.w.Wait()
 
 	*l = len(*r)
 }
 
-func numGoroutines(a int) int {
+func (c *dbscanClusterer) startWorkers() {
+	c.j = make(chan *nearestJob, c.s)
+
+	for i := 0; i < c.s; i++ {
+		go c.nearestWorker()
+	}
+}
+
+func (c *dbscanClusterer) endWorkers() {
+	close(c.j)
+}
+
+func (c *dbscanClusterer) nearestWorker() {
+	for j := range c.j {
+		for i := j.a; i < j.b; i++ {
+			if c.distance(*c.p, c.d[i]) < c.eps {
+				c.m.Lock()
+				*c.r = append(*c.r, i)
+				c.m.Unlock()
+			}
+		}
+
+		c.w.Done()
+	}
+}
+
+func numWorkers(a int) int {
 	if a < 1000 {
 		return 1
 	} else if a < 10000 {
@@ -229,11 +256,7 @@ func numGoroutines(a int) int {
 		return 100
 	} else if a < 1000000 {
 		return 1000
-	} else if a < 10000000 {
-		return 10000
-	} else if a < 100000000 {
-		return 100000
 	} else {
-		return 1000000
+		return 10000
 	}
 }

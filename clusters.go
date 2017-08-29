@@ -41,11 +41,14 @@ type HardClusterer interface {
 	/* Returns index of cluster to which the observation was assigned */
 	Predict(observation []float64) int
 
-	/* Provides a method to train the algorithm online and receive intermediate results of computation */
-	Online(observations chan []float64, done chan struct{}) chan *HCEvent
+	/* Whether algorithm supports online learning */
+	IsOnline() bool
 
 	/* Allows to configure the algorithms for online learning */
 	WithOnline(Online) HardClusterer
+
+	/* Provides a method to train the algorithm online and receive intermediate results of computation */
+	Online(observations chan []float64, done chan struct{}) chan *HCEvent
 
 	Clusterer
 }
@@ -61,11 +64,14 @@ type SoftClusterer interface {
 	/* Returns probabilities of the observation being assigned to respective clusters */
 	Predict(observation []float64) []float64
 
-	/* Provides a method to train the algorithm online and receive intermediate results of computation */
-	Online(observations chan []float64, done chan struct{}) chan *SCEvent
+	/* Whether algorithm supports online learning */
+	IsOnline() bool
 
 	/* Allows to configure the algorithms for online learning */
 	WithOnline(Online) SoftClusterer
+
+	/* Provides a method to train the algorithm online and receive intermediate results of computation */
+	Online(observations chan []float64, done chan struct{}) chan *SCEvent
 
 	Clusterer
 }
