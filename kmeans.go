@@ -84,10 +84,6 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 	c.a = make([]int, len(data))
 	c.b = make([]int, c.number)
 
-	for i := 0; i < len(data); i++ {
-		c.a[i] = -1
-	}
-
 	c.counter = 0
 	c.threshold = CHANGES_THRESHOLD
 	c.changes = 0
@@ -200,7 +196,7 @@ func (c *kmeansClusterer) Online(observations chan []float64, done chan struct{}
 							}
 						}
 
-						c.a[i] = n
+						c.a[i] = n + 1
 						c.b[n]++
 					}
 
@@ -275,8 +271,8 @@ func (c *kmeansClusterer) initializeMeans() {
 
 func (c *kmeansClusterer) run() {
 	var (
-		n, l int = 0, len(c.m[0])
-		d, m float64
+		l, k, n int = len(c.m[0]), 0, 0
+		m, d    float64
 	)
 
 	for i := 0; i < c.number; i++ {
@@ -294,11 +290,13 @@ func (c *kmeansClusterer) run() {
 			}
 		}
 
-		if c.a[i] != n {
+		k = n + 1
+
+		if c.a[i] != k {
 			c.changes++
 		}
 
-		c.a[i] = n
+		c.a[i] = k
 		c.b[n]++
 
 		floats.Add(c.n[n], c.d[i])
