@@ -35,7 +35,7 @@ type HardClusterer interface {
 	/* Returns sizes of respective clusters */
 	Sizes() []int
 
-	/* Returns mapping from data point indices to cluster index */
+	/* Returns mapping from data point indices to cluster index. Cluster indices begin at 1, not 0. */
 	Guesses() []int
 
 	/* Returns index of cluster to which the observation was assigned */

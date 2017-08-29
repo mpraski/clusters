@@ -100,9 +100,9 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 		c.check()
 	}
 
-	c.mu.Unlock()
-
 	c.n = nil
+
+	c.mu.Unlock()
 
 	return nil
 }
