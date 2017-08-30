@@ -5,8 +5,9 @@ import (
 )
 
 type dbscanClusterer struct {
-	minpts int
-	eps    float64
+	minpts  int
+	workers int
+	eps     float64
 
 	l, s, o, f int
 
@@ -35,9 +36,13 @@ type nearestJob struct {
 }
 
 /* Implementation of DBSCAN algorithm with concurrent moditication */
-func DbscanClusterer(minpts int, eps float64, distance DistanceFunc) (HardClusterer, error) {
+func DbscanClusterer(minpts int, eps float64, workers int, distance DistanceFunc) (HardClusterer, error) {
 	if minpts < 1 {
 		return nil, ErrZeroMinpts
+	}
+
+	if workers < 0 {
+		return nil, ErrZeroWorkers
 	}
 
 	if eps <= 0 {
@@ -55,6 +60,7 @@ func DbscanClusterer(minpts int, eps float64, distance DistanceFunc) (HardCluste
 
 	return &dbscanClusterer{
 		minpts:   minpts,
+		workers:  workers,
 		eps:      eps,
 		distance: d,
 	}, nil
@@ -76,7 +82,7 @@ func (c *dbscanClusterer) Learn(data [][]float64) error {
 	c.mu.Lock()
 
 	c.l = len(data)
-	c.s = numWorkers(c.l)
+	c.s = c.numWorkers()
 	c.o = c.s - 1
 	c.f = c.l / c.s
 
@@ -196,8 +202,6 @@ func (c *dbscanClusterer) nearest(p *int, l *int, r *[]int) {
 
 	*r = (*r)[:0]
 
-	c.m = &sync.Mutex{}
-	c.w = &sync.WaitGroup{}
 	c.p = &c.d[*p]
 	c.r = r
 
@@ -222,7 +226,10 @@ func (c *dbscanClusterer) nearest(p *int, l *int, r *[]int) {
 }
 
 func (c *dbscanClusterer) startWorkers() {
-	c.j = make(chan *nearestJob, c.s)
+	c.j = make(chan *nearestJob, c.l)
+
+	c.m = &sync.Mutex{}
+	c.w = &sync.WaitGroup{}
 
 	for i := 0; i < c.s; i++ {
 		go c.nearestWorker()
@@ -247,16 +254,32 @@ func (c *dbscanClusterer) nearestWorker() {
 	}
 }
 
-func numWorkers(a int) int {
+func (c *dbscanClusterer) numWorkers() int {
+	var (
+		a int = c.l
+		b int
+	)
+
 	if a < 1000 {
-		return 1
+		b = 1
 	} else if a < 10000 {
-		return 10
+		b = 10
 	} else if a < 100000 {
-		return 100
+		b = 100
 	} else if a < 1000000 {
-		return 1000
+		b = 1000
 	} else {
-		return 10000
+		b = 10000
 	}
+
+	if c.workers == 0 {
+		return b
+	}
+
+	if c.workers < b {
+		return c.workers
+	}
+
+	return b
+
 }

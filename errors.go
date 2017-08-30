@@ -9,4 +9,5 @@ var (
 	ErrOneCluster     = errors.New("Number of clusters cannot be less than 2")
 	ErrZeroEpsilon    = errors.New("Epsilon cannot be 0")
 	ErrZeroMinpts     = errors.New("MinPts cannot be 0")
+	ErrZeroWorkers    = errors.New("Number of workers cannot be less than 0")
 )
