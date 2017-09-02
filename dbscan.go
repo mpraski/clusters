@@ -9,34 +9,29 @@ type dbscanClusterer struct {
 	workers int
 	eps     float64
 
-	l, s, o, f int
-
 	distance DistanceFunc
 
+	// slices holding the cluster mapping and sizes
 	mu   sync.RWMutex
 	a, b []int
 
-	// channel for distributed searching for nearest neighbours
-	j chan *nearestJob
-
-	// variabes for calculating nearest neighbours concurrently
-	m *sync.Mutex
-	w *sync.WaitGroup
-	p *[]float64
-	r *[]int
+	// variables used for concurrent computation of nearest neighbours
+	l, s, o, f int
+	j          chan *rangeJob
+	m          *sync.Mutex
+	w          *sync.WaitGroup
+	p          *[]float64
+	r          *[]int
 
 	// visited points
 	v []bool
 
+	// dataset
 	d [][]float64
 }
 
-type nearestJob struct {
-	a, b int
-}
-
-/* Implementation of DBSCAN algorithm with concurrent moditication */
-func DbscanClusterer(minpts int, eps float64, workers int, distance DistanceFunc) (HardClusterer, error) {
+/* Implementation of DBSCAN algorithm with concurrent nearest neighbour computation */
+func DBSCAN(minpts int, eps float64, workers int, distance DistanceFunc) (HardClusterer, error) {
 	if minpts < 1 {
 		return nil, ErrZeroMinpts
 	}
@@ -159,7 +154,7 @@ func (c *dbscanClusterer) run() {
 
 		c.v[i] = true
 
-		c.nearest(&i, &l, &ns)
+		c.nearest(i, &l, &ns)
 
 		if l < c.minpts {
 			c.a[i] = -1
@@ -173,7 +168,7 @@ func (c *dbscanClusterer) run() {
 				if !c.v[ns[j]] {
 					c.v[ns[j]] = true
 
-					c.nearest(&ns[j], &k, &nss)
+					c.nearest(ns[j], &k, &nss)
 
 					if k >= c.minpts {
 						l += k
@@ -197,12 +192,12 @@ func (c *dbscanClusterer) run() {
  * by the size of the data. This is based on an assumption that neighbour points of p
  * are located in relatively small subsection of the input data, so the dataset can be scanned
  * concurrently without blocking a big number of goroutines trying to write to r */
-func (c *dbscanClusterer) nearest(p *int, l *int, r *[]int) {
+func (c *dbscanClusterer) nearest(p int, l *int, r *[]int) {
 	var b int
 
 	*r = (*r)[:0]
 
-	c.p = &c.d[*p]
+	c.p = &c.d[p]
 	c.r = r
 
 	c.w.Add(c.s)
@@ -214,7 +209,7 @@ func (c *dbscanClusterer) nearest(p *int, l *int, r *[]int) {
 			b = (i + 1) * c.f
 		}
 
-		c.j <- &nearestJob{
+		c.j <- &rangeJob{
 			a: i * c.f,
 			b: b,
 		}
@@ -226,7 +221,7 @@ func (c *dbscanClusterer) nearest(p *int, l *int, r *[]int) {
 }
 
 func (c *dbscanClusterer) startWorkers() {
-	c.j = make(chan *nearestJob, c.l)
+	c.j = make(chan *rangeJob, c.l)
 
 	c.m = &sync.Mutex{}
 	c.w = &sync.WaitGroup{}
@@ -255,18 +250,15 @@ func (c *dbscanClusterer) nearestWorker() {
 }
 
 func (c *dbscanClusterer) numWorkers() int {
-	var (
-		a int = c.l
-		b int
-	)
+	var b int
 
-	if a < 1000 {
+	if c.l < 1000 {
 		b = 1
-	} else if a < 10000 {
+	} else if c.l < 10000 {
 		b = 10
-	} else if a < 100000 {
+	} else if c.l < 100000 {
 		b = 100
-	} else if a < 1000000 {
+	} else if c.l < 1000000 {
 		b = 1000
 	} else {
 		b = 10000

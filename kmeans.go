@@ -18,7 +18,7 @@ type kmeansClusterer struct {
 	iterations int
 	number     int
 
-	// Variables keeping count of changes of points' membership every iteration. User as a stopping condition.
+	// variables keeping count of changes of points' membership every iteration. User as a stopping condition.
 	changes, oldchanges, counter, threshold int
 
 	// For online learning only
@@ -27,17 +27,18 @@ type kmeansClusterer struct {
 
 	distance DistanceFunc
 
-	// a holds the mapping of data point indices to cluster numbers, b holds the sizes of each cluster
+	// slices holding the cluster mapping and sizes
 	mu   sync.RWMutex
 	a, b []int
 
-	// variables holding values of centroids of each clusters
+	// slices holding values of centroids of each clusters
 	m, n [][]float64
 
+	// dataset
 	d [][]float64
 }
 
-func KmeansClusterer(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
+func KMeans(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
 	if iterations < 1 {
 		return nil, ErrZeroIterations
 	}
