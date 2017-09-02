@@ -166,8 +166,9 @@ func (c *opticsClusterer) Online(observations chan []float64, done chan struct{}
 
 func (c *opticsClusterer) run() {
 	var (
-		l       = 0
-		ns, nss = make([]int, 0), make([]int, 0)
+		l       int
+		d       float64
+		ns, nss []int = make([]int, 0), make([]int, 0)
 		q       priorityQueue
 		p       *pItem
 	)
@@ -183,10 +184,10 @@ func (c *opticsClusterer) run() {
 
 		c.so = append(c.so, i)
 
-		if c.coreDistance(i, &l, &ns) != 0 {
+		if d = c.coreDistance(i, &l, &ns); d != 0 {
 			q = newPriorityQueue(l)
 
-			c.update(i, &l, &ns, &q)
+			c.update(i, d, &l, &ns, &q)
 
 			for q.NotEmpty() {
 				p = q.Pop().(*pItem)
@@ -197,8 +198,8 @@ func (c *opticsClusterer) run() {
 
 				c.so = append(c.so, p.v)
 
-				if c.coreDistance(p.v, &l, &nss) != 0 {
-					c.update(p.v, &l, &nss, &q)
+				if d = c.coreDistance(p.v, &l, &nss); d != 0 {
+					c.update(p.v, d, &l, &nss, &q)
 				}
 			}
 		}
@@ -221,9 +222,7 @@ func (c *opticsClusterer) coreDistance(p int, l *int, r *[]int) float64 {
 	return m
 }
 
-func (c *opticsClusterer) update(p int, l *int, r *[]int, q *priorityQueue) {
-	d := c.coreDistance(p, l, r)
-
+func (c *opticsClusterer) update(p int, d float64, l *int, r *[]int, q *priorityQueue) {
 	for i := 0; i < *l; i++ {
 		if !c.v[(*r)[i]] {
 			m := math.Max(d, c.distance(c.d[p], c.d[(*r)[i]]))
