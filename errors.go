@@ -10,4 +10,5 @@ var (
 	ErrZeroEpsilon    = errors.New("Epsilon cannot be 0")
 	ErrZeroMinpts     = errors.New("MinPts cannot be 0")
 	ErrZeroWorkers    = errors.New("Number of workers cannot be less than 0")
+	ErrZeroXi         = errors.New("Xi cannot be 0")
 )

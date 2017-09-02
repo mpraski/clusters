@@ -95,8 +95,6 @@ func (c *dbscanClusterer) Learn(data [][]float64) error {
 	c.endWorkers()
 
 	c.v = nil
-	c.m = nil
-	c.w = nil
 	c.p = nil
 	c.r = nil
 
@@ -202,15 +200,15 @@ func (c *dbscanClusterer) nearest(p int, l *int, r *[]int) {
 
 	c.w.Add(c.s)
 
-	for i := 0; i < c.s; i++ {
-		if i == c.o {
+	for i := 0; i < c.l; i += c.f {
+		if c.l-i <= c.f {
 			b = c.l - 1
 		} else {
-			b = (i + 1) * c.f
+			b = i + c.f
 		}
 
 		c.j <- &rangeJob{
-			a: i * c.f,
+			a: i,
 			b: b,
 		}
 	}
@@ -233,6 +231,11 @@ func (c *dbscanClusterer) startWorkers() {
 
 func (c *dbscanClusterer) endWorkers() {
 	close(c.j)
+
+	c.j = nil
+
+	c.m = nil
+	c.w = nil
 }
 
 func (c *dbscanClusterer) nearestWorker() {
@@ -258,10 +261,8 @@ func (c *dbscanClusterer) numWorkers() int {
 		b = 10
 	} else if c.l < 100000 {
 		b = 100
-	} else if c.l < 1000000 {
-		b = 1000
 	} else {
-		b = 10000
+		b = 1000
 	}
 
 	if c.workers == 0 {
