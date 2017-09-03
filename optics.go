@@ -1,6 +1,7 @@
 package clusters
 
 import (
+	"fmt"
 	"math"
 	"sync"
 )
@@ -10,13 +11,16 @@ type steepDownArea struct {
 	mib        float64
 }
 
+type clusterBounds struct {
+	start, end int
+}
+
 type opticsClusterer struct {
 	minpts  int
 	workers int
 	eps     float64
 
-	// 1 - xi
-	x float64
+	xi, x float64
 
 	distance DistanceFunc
 
@@ -76,6 +80,7 @@ func OPTICS(minpts int, eps, xi float64, workers int, distance DistanceFunc) (Ha
 		minpts:   minpts,
 		workers:  workers,
 		eps:      eps,
+		xi:       xi,
 		x:        1 - xi,
 		distance: d,
 	}, nil
@@ -115,11 +120,15 @@ func (c *opticsClusterer) Learn(data [][]float64) error {
 
 	c.endWorkers()
 
+	fmt.Printf("Done running\n")
+
 	c.v = nil
 	c.p = nil
 	c.r = nil
 
 	c.extract()
+
+	fmt.Printf("Done extracting\n")
 
 	c.re = nil
 	c.so = nil
@@ -245,13 +254,15 @@ func (c *opticsClusterer) update(p int, d float64, l *int, r *[]int, q *priority
 
 func (c *opticsClusterer) extract() {
 	var (
-		i, e  int
-		mib   float64
-		areas []*steepDownArea = make([]*steepDownArea, 0)
+		i, e, us, ue, cs, ce, s int
+		mib, d                  float64
+		areas                   []*steepDownArea       = make([]*steepDownArea, 0)
+		clusters                map[int]*clusterBounds = make(map[int]*clusterBounds)
 	)
 
 	for i < c.l-1 {
 		if c.re[c.so[i]] == nil || c.re[c.so[i+1]] == nil {
+			i++
 			continue
 		}
 
@@ -279,8 +290,10 @@ func (c *opticsClusterer) extract() {
 
 			i = e + 1
 			mib = c.re[c.so[i]].p
-
 		} else if c.isSteepUp(i, &e) {
+			us = i
+			ue = e + 1
+
 			as := areas[:0]
 			for j := 0; j < len(areas); j++ {
 				if c.re[c.so[areas[j].start]].p*c.x < mib {
@@ -299,7 +312,45 @@ func (c *opticsClusterer) extract() {
 			mib = c.re[c.so[i]].p
 
 			for j := 0; j < len(areas); j++ {
-				// check for cluster satisfying conditions outlined by Ankerst at al.
+				if c.re[c.so[ue]].p*c.x < areas[j].mib {
+					continue
+				}
+
+				d = (c.re[c.so[areas[j].start]].p - c.re[c.so[ue]].p) / c.re[c.so[areas[j].start]].p
+
+				if math.Abs(d) <= c.xi {
+					cs = areas[j].start
+					ce = ue
+				} else if d > c.xi {
+					for k := areas[j].end; k > areas[j].end; k-- {
+						if math.Abs((c.re[c.so[k]].p-c.re[c.so[ue]].p)/c.re[c.so[k]].p) <= c.xi {
+							cs = k
+							break
+						}
+					}
+					ce = ue
+				} else {
+					cs = areas[j].start
+					for k := us; k < ue-1; k++ {
+						if math.Abs((c.re[c.so[k]].p-c.re[c.so[us]].p)/c.re[c.so[k]].p) <= c.xi {
+							ce = k
+							break
+						}
+					}
+				}
+
+				if ce-cs < c.minpts {
+					continue
+				}
+
+				s = cs + ce
+
+				if _, ok := clusters[s]; !ok {
+					clusters[s] = &clusterBounds{
+						start: cs,
+						end:   ce,
+					}
+				}
 			}
 		} else {
 			i++
@@ -317,7 +368,7 @@ func (c *opticsClusterer) isSteepDown(i int, e *int) bool {
 	*e = j
 
 	for {
-		if c.re[c.so[j]].p < c.re[c.so[j+1]].p {
+		if c.re[c.so[j+1]] == nil || c.re[c.so[j]].p < c.re[c.so[j+1]].p {
 			break
 		}
 
@@ -331,9 +382,11 @@ func (c *opticsClusterer) isSteepDown(i int, e *int) bool {
 		if counter > c.minpts {
 			break
 		}
+
+		j++
 	}
 
-	return *e != j
+	return *e != i+1
 }
 
 func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
@@ -346,7 +399,7 @@ func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
 	*e = j
 
 	for {
-		if c.re[c.so[j]].p > c.re[c.so[j+1]].p {
+		if c.re[c.so[j+1]] == nil || c.re[c.so[j]].p > c.re[c.so[j+1]].p {
 			break
 		}
 
@@ -360,9 +413,11 @@ func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
 		if counter > c.minpts {
 			break
 		}
+
+		j++
 	}
 
-	return *e != j
+	return *e != i+1
 }
 
 /* Divide work among c.s workers, where c.s is determined
