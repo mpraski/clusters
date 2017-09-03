@@ -88,11 +88,11 @@ func (c *dbscanClusterer) Learn(data [][]float64) error {
 	c.a = make([]int, c.l)
 	c.b = make([]int, 0)
 
-	c.startWorkers()
+	c.startNearestWorkers()
 
 	c.run()
 
-	c.endWorkers()
+	c.endNearestWorkers()
 
 	c.v = nil
 	c.p = nil
@@ -218,7 +218,7 @@ func (c *dbscanClusterer) nearest(p int, l *int, r *[]int) {
 	*l = len(*r)
 }
 
-func (c *dbscanClusterer) startWorkers() {
+func (c *dbscanClusterer) startNearestWorkers() {
 	c.j = make(chan *rangeJob, c.l)
 
 	c.m = &sync.Mutex{}
@@ -229,7 +229,7 @@ func (c *dbscanClusterer) startWorkers() {
 	}
 }
 
-func (c *dbscanClusterer) endWorkers() {
+func (c *dbscanClusterer) endNearestWorkers() {
 	close(c.j)
 
 	c.j = nil

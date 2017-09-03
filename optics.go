@@ -1,7 +1,6 @@
 package clusters
 
 import (
-	"fmt"
 	"math"
 	"sync"
 )
@@ -11,8 +10,8 @@ type steepDownArea struct {
 	mib        float64
 }
 
-type clusterBounds struct {
-	start, end int
+type clusterJob struct {
+	a, b, n int
 }
 
 type opticsClusterer struct {
@@ -28,9 +27,10 @@ type opticsClusterer struct {
 	mu   sync.RWMutex
 	a, b []int
 
-	// variables used for concurrent computation of nearest neighbours
+	// variables used for concurrent computation of nearest neighbours and producing final mapping
 	l, s, o, f int
 	j          chan *rangeJob
+	c          chan *clusterJob
 	m          *sync.Mutex
 	w          *sync.WaitGroup
 	p          *[]float64
@@ -114,21 +114,21 @@ func (c *opticsClusterer) Learn(data [][]float64) error {
 	c.a = make([]int, c.l)
 	c.b = make([]int, 0)
 
-	c.startWorkers()
+	c.startNearestWorkers()
 
 	c.run()
 
-	c.endWorkers()
-
-	fmt.Printf("Done running\n")
+	c.endNearestWorkers()
 
 	c.v = nil
 	c.p = nil
 	c.r = nil
 
+	c.startClusterWorkers()
+
 	c.extract()
 
-	fmt.Printf("Done extracting\n")
+	c.endClusterWorkers()
 
 	c.re = nil
 	c.so = nil
@@ -254,10 +254,10 @@ func (c *opticsClusterer) update(p int, d float64, l *int, r *[]int, q *priority
 
 func (c *opticsClusterer) extract() {
 	var (
-		i, e, us, ue, cs, ce, s int
-		mib, d                  float64
-		areas                   []*steepDownArea       = make([]*steepDownArea, 0)
-		clusters                map[int]*clusterBounds = make(map[int]*clusterBounds)
+		i, e, us, ue, cs, ce, s, k int
+		mib, d                     float64
+		areas                      []*steepDownArea = make([]*steepDownArea, 0)
+		clusters                   map[int]bool     = make(map[int]bool)
 	)
 
 	for i < c.l-1 {
@@ -345,17 +345,28 @@ func (c *opticsClusterer) extract() {
 
 				s = cs + ce
 
-				if _, ok := clusters[s]; !ok {
-					clusters[s] = &clusterBounds{
-						start: cs,
-						end:   ce,
+				if !clusters[s] {
+					clusters[s] = true
+
+					c.b[k] = ce - cs
+
+					c.w.Add(1)
+
+					c.c <- &clusterJob{
+						a: cs,
+						b: ce,
+						n: k,
 					}
+
+					k++
 				}
 			}
 		} else {
 			i++
 		}
 	}
+
+	c.w.Wait()
 }
 
 func (c *opticsClusterer) isSteepDown(i int, e *int) bool {
@@ -420,6 +431,34 @@ func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
 	return *e != i+1
 }
 
+func (c *opticsClusterer) startClusterWorkers() {
+	c.c = make(chan *clusterJob, c.l)
+
+	c.w = &sync.WaitGroup{}
+
+	for i := 0; i < c.s; i++ {
+		go c.clusterWorker()
+	}
+}
+
+func (c *opticsClusterer) endClusterWorkers() {
+	close(c.c)
+
+	c.c = nil
+
+	c.w = nil
+}
+
+func (c *opticsClusterer) clusterWorker() {
+	for j := range c.c {
+		for i := j.a; i < j.b; i++ {
+			c.a[i] = j.n
+		}
+
+		c.w.Done()
+	}
+}
+
 /* Divide work among c.s workers, where c.s is determined
  * by the size of the data. This is based on an assumption that neighbour points of p
  * are located in relatively small subsection of the input data, so the dataset can be scanned
@@ -452,7 +491,7 @@ func (c *opticsClusterer) nearest(p int, l *int, r *[]int) {
 	*l = len(*r)
 }
 
-func (c *opticsClusterer) startWorkers() {
+func (c *opticsClusterer) startNearestWorkers() {
 	c.j = make(chan *rangeJob, c.l)
 
 	c.m = &sync.Mutex{}
@@ -463,7 +502,7 @@ func (c *opticsClusterer) startWorkers() {
 	}
 }
 
-func (c *opticsClusterer) endWorkers() {
+func (c *opticsClusterer) endNearestWorkers() {
 	close(c.j)
 
 	c.j = nil
