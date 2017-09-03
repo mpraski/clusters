@@ -5,13 +5,12 @@ import (
 )
 
 type dbscanClusterer struct {
-	minpts  int
-	workers int
-	eps     float64
+	minpts, workers int
+	eps             float64
 
 	distance DistanceFunc
 
-	// slices holding the cluster mapping and sizes
+	// slices holding the cluster mapping and sizes. Access is synchronized to avoid read during computation.
 	mu   sync.RWMutex
 	a, b []int
 

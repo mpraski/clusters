@@ -15,15 +15,12 @@ type clusterJob struct {
 }
 
 type opticsClusterer struct {
-	minpts  int
-	workers int
-	eps     float64
-
-	xi, x float64
+	minpts, workers int
+	eps, xi, x      float64
 
 	distance DistanceFunc
 
-	// slices holding the cluster mapping and sizes
+	// slices holding the cluster mapping and sizes. Access is synchronized to avoid read during computation.
 	mu   sync.RWMutex
 	a, b []int
 
@@ -254,18 +251,13 @@ func (c *opticsClusterer) update(p int, d float64, l *int, r *[]int, q *priority
 
 func (c *opticsClusterer) extract() {
 	var (
-		i, e, us, ue, cs, ce, s, k int
-		mib, d                     float64
-		areas                      []*steepDownArea = make([]*steepDownArea, 0)
-		clusters                   map[int]bool     = make(map[int]bool)
+		i, k, e, ue, cs, ce, s, p int = 1, 1, 0, 0, 0, 0, 0, 0
+		mib, d                    float64
+		areas                     []*steepDownArea = make([]*steepDownArea, 0)
+		clusters                  map[int]bool     = make(map[int]bool)
 	)
 
-	for i < c.l-1 {
-		if c.re[c.so[i]] == nil || c.re[c.so[i+1]] == nil {
-			i++
-			continue
-		}
-
+	for i < c.l-2 {
 		mib = math.Max(mib, c.re[c.so[i]].p)
 
 		if c.isSteepDown(i, &e) {
@@ -291,7 +283,6 @@ func (c *opticsClusterer) extract() {
 			i = e + 1
 			mib = c.re[c.so[i]].p
 		} else if c.isSteepUp(i, &e) {
-			us = i
 			ue = e + 1
 
 			as := areas[:0]
@@ -307,9 +298,6 @@ func (c *opticsClusterer) extract() {
 				})
 			}
 			areas = as
-
-			i = e + 1
-			mib = c.re[c.so[i]].p
 
 			for j := 0; j < len(areas); j++ {
 				if c.re[c.so[ue]].p*c.x < areas[j].mib {
@@ -331,24 +319,27 @@ func (c *opticsClusterer) extract() {
 					ce = ue
 				} else {
 					cs = areas[j].start
-					for k := us; k < ue-1; k++ {
-						if math.Abs((c.re[c.so[k]].p-c.re[c.so[us]].p)/c.re[c.so[k]].p) <= c.xi {
+					for k := i; k < e; k++ {
+						if math.Abs((c.re[c.so[k]].p-c.re[c.so[i]].p)/c.re[c.so[k]].p) <= c.xi {
 							ce = k
 							break
 						}
 					}
 				}
 
-				if ce-cs < c.minpts {
+				p = ce - cs
+
+				if p < c.minpts {
 					continue
 				}
 
-				s = cs + ce
+				s = ce + cs
 
 				if !clusters[s] {
 					clusters[s] = true
 
-					c.b[k] = ce - cs
+					c.b = append(c.b, 0)
+					c.b[k] = p
 
 					c.w.Add(1)
 
@@ -361,6 +352,9 @@ func (c *opticsClusterer) extract() {
 					k++
 				}
 			}
+
+			i = ue
+			mib = c.re[c.so[i]].p
 		} else {
 			i++
 		}

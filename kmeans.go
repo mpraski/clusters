@@ -15,8 +15,7 @@ const (
 
 /* Implementation of k-means++ algorithm with online learning */
 type kmeansClusterer struct {
-	iterations int
-	number     int
+	iterations, number int
 
 	// variables keeping count of changes of points' membership every iteration. User as a stopping condition.
 	changes, oldchanges, counter, threshold int
@@ -27,7 +26,7 @@ type kmeansClusterer struct {
 
 	distance DistanceFunc
 
-	// slices holding the cluster mapping and sizes
+	// slices holding the cluster mapping and sizes. Access is synchronized to avoid read during computation.
 	mu   sync.RWMutex
 	a, b []int
 
