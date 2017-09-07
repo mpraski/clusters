@@ -25,13 +25,13 @@ type opticsClusterer struct {
 	a, b []int
 
 	// variables used for concurrent computation of nearest neighbours and producing final mapping
-	l, s, o, f int
-	j          chan *rangeJob
-	c          chan *clusterJob
-	m          *sync.Mutex
-	w          *sync.WaitGroup
-	p          *[]float64
-	r          *[]int
+	l, s, o, f, g int
+	j             chan *rangeJob
+	c             chan *clusterJob
+	m             *sync.Mutex
+	w             *sync.WaitGroup
+	p             *[]float64
+	r             *[]int
 
 	// visited points
 	v []bool
@@ -251,13 +251,17 @@ func (c *opticsClusterer) update(p int, d float64, l *int, r *[]int, q *priority
 
 func (c *opticsClusterer) extract() {
 	var (
-		i, k, e, ue, cs, ce, s, p int = 1, 1, 0, 0, 0, 0, 0, 0
+		i, k, e, ue, cs, ce, s, p int = 0, 1, 0, 0, 0, 0, 0, 0
 		mib, d                    float64
 		areas                     []*steepDownArea = make([]*steepDownArea, 0)
 		clusters                  map[int]bool     = make(map[int]bool)
 	)
 
-	for i < c.l-2 {
+	// first and last points are not assigned the reachability distance, so exclude them from calculations
+	c.so = c.so[1 : len(c.so)-2]
+	c.g = len(c.so) - 2
+
+	for i < len(c.so)-1 {
 		mib = math.Max(mib, c.re[c.so[i]].p)
 
 		if c.isSteepDown(i, &e) {
@@ -368,12 +372,16 @@ func (c *opticsClusterer) isSteepDown(i int, e *int) bool {
 		return false
 	}
 
-	var counter, j int = 0, i + 1
+	var counter, j int = 0, i
 
 	*e = j
 
 	for {
-		if c.re[c.so[j+1]] == nil || c.re[c.so[j]].p < c.re[c.so[j+1]].p {
+		if j > c.g {
+			break
+		}
+
+		if c.re[c.so[j]].p < c.re[c.so[j+1]].p {
 			break
 		}
 
@@ -391,7 +399,7 @@ func (c *opticsClusterer) isSteepDown(i int, e *int) bool {
 		j++
 	}
 
-	return *e != i+1
+	return *e != i
 }
 
 func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
@@ -399,12 +407,16 @@ func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
 		return false
 	}
 
-	var counter, j int = 0, i + 1
+	var counter, j int = 0, i
 
 	*e = j
 
 	for {
-		if c.re[c.so[j+1]] == nil || c.re[c.so[j]].p > c.re[c.so[j+1]].p {
+		if j > c.g {
+			break
+		}
+
+		if c.re[c.so[j]].p > c.re[c.so[j+1]].p {
 			break
 		}
 
@@ -422,7 +434,7 @@ func (c *opticsClusterer) isSteepUp(i int, e *int) bool {
 		j++
 	}
 
-	return *e != i+1
+	return *e != i
 }
 
 func (c *opticsClusterer) startClusterWorkers() {
