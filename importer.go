@@ -24,16 +24,19 @@ func (i *Importer) Import(file string) ([][]float64, error) {
 
 	defer f.Close()
 
-	c, err := i.lineCount(bufio.NewReader(f))
+	b := bufio.NewReader(f)
+
+	c, err := i.lineCount(bufio.NewReader(b))
 	if err != nil {
 		return [][]float64{}, err
 	}
 
 	f.Seek(0, 0)
+	b.Reset(f)
 
 	var (
 		d = make([][]float64, c)
-		r = csv.NewReader(f)
+		r = csv.NewReader(b)
 		k = 0
 	)
 
