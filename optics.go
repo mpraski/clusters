@@ -190,10 +190,10 @@ func (c *opticsClusterer) run() {
 
 		c.so = append(c.so, i)
 
-		if d = c.coreDistance(i, &l, &ns); d != 0 {
+		if d = c.coreDistance(i, l, &ns); d != 0 {
 			q = newPriorityQueue(l)
 
-			c.update(i, d, &l, &ns, &q)
+			c.update(i, d, l, &ns, &q)
 
 			for q.NotEmpty() {
 				p = q.Pop().(*pItem)
@@ -204,22 +204,22 @@ func (c *opticsClusterer) run() {
 
 				c.so = append(c.so, p.v)
 
-				if d = c.coreDistance(p.v, &l, &nss); d != 0 {
-					c.update(p.v, d, &l, &nss, &q)
+				if d = c.coreDistance(p.v, l, &nss); d != 0 {
+					c.update(p.v, d, l, &nss, &q)
 				}
 			}
 		}
 	}
 }
 
-func (c *opticsClusterer) coreDistance(p int, l *int, r *[]int) float64 {
-	if *l < c.minpts {
+func (c *opticsClusterer) coreDistance(p int, l int, r *[]int) float64 {
+	if l < c.minpts {
 		return 0
 	}
 
 	var d, m float64 = 0, c.distance(c.d[p], c.d[(*r)[0]])
 
-	for i := 1; i < *l; i++ {
+	for i := 1; i < l; i++ {
 		if d = c.distance(c.d[p], c.d[(*r)[i]]); d > m {
 			m = d
 		}
@@ -228,8 +228,8 @@ func (c *opticsClusterer) coreDistance(p int, l *int, r *[]int) float64 {
 	return m
 }
 
-func (c *opticsClusterer) update(p int, d float64, l *int, r *[]int, q *priorityQueue) {
-	for i := 0; i < *l; i++ {
+func (c *opticsClusterer) update(p int, d float64, l int, r *[]int, q *priorityQueue) {
+	for i := 0; i < l; i++ {
 		if !c.v[(*r)[i]] {
 			m := math.Max(d, c.distance(c.d[p], c.d[(*r)[i]]))
 

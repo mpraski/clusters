@@ -12,7 +12,7 @@ func TestQueueEmptyWhenCreated(t *testing.T) {
 }
 
 func TestQueueNowEmptyAfterAdd(t *testing.T) {
-	queue := newPriorityQueue(0)
+	queue := newPriorityQueue(1)
 
 	queue.Push(&pItem{
 		v: 0,
@@ -25,7 +25,7 @@ func TestQueueNowEmptyAfterAdd(t *testing.T) {
 }
 
 func TestQueueReturnsInPriorityOrder(t *testing.T) {
-	queue := newPriorityQueue(0)
+	queue := newPriorityQueue(2)
 
 	var (
 		itemOne = &pItem{
@@ -55,7 +55,7 @@ func TestQueueReturnsInPriorityOrder(t *testing.T) {
 }
 
 func TestQueueReturnsInPriorityOrderAfterUpdate(t *testing.T) {
-	queue := newPriorityQueue(0)
+	queue := newPriorityQueue(2)
 
 	var (
 		itemOne = &pItem{
