@@ -19,7 +19,7 @@ type dbscanClusterer struct {
 	j          chan *rangeJob
 	m          *sync.Mutex
 	w          *sync.WaitGroup
-	p          *[]float64
+	p          []float64
 	r          *[]int
 
 	// visited points
@@ -194,7 +194,7 @@ func (c *dbscanClusterer) nearest(p int, l *int, r *[]int) {
 
 	*r = (*r)[:0]
 
-	c.p = &c.d[p]
+	c.p = c.d[p]
 	c.r = r
 
 	c.w.Add(c.s)
@@ -240,7 +240,7 @@ func (c *dbscanClusterer) endNearestWorkers() {
 func (c *dbscanClusterer) nearestWorker() {
 	for j := range c.j {
 		for i := j.a; i < j.b; i++ {
-			if c.distance(*c.p, c.d[i]) < c.eps {
+			if c.distance(c.p, c.d[i]) < c.eps {
 				c.m.Lock()
 				*c.r = append(*c.r, i)
 				c.m.Unlock()
