@@ -30,8 +30,8 @@ type opticsClusterer struct {
 	c             chan *clusterJob
 	m             *sync.Mutex
 	w             *sync.WaitGroup
-	p             []float64
 	r             *[]int
+	p             []float64
 
 	// visited points
 	v []bool

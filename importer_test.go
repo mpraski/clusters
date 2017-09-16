@@ -14,9 +14,9 @@ func TestImportedLoadDataOfCorrectLengh(t *testing.T) {
 		s = 3
 	)
 
-	d, e := i.Import(f)
+	d, e := i.Import(f, 0, 2, 3)
 	if e != nil {
-		t.Errorf("Error importing data: %e", e)
+		t.Errorf("Error importing data: %s", e.Error())
 	}
 
 	if s != len(d) {
@@ -35,13 +35,13 @@ func TestImportedLoadCorrectData(t *testing.T) {
 		}
 	)
 
-	d, e := i.Import(f)
+	d, e := i.Import(f, 0, 2, 3)
 	if e != nil {
-		t.Errorf("Error importing data: %e", e)
+		t.Errorf("Error importing data: %s", e.Error())
 	}
 
 	if !fsliceEqual(d, s) {
-		t.Error("Imported data mismatch")
+		t.Error("Imported data mismatch: %v vs %v", d, s)
 	}
 }
 
@@ -63,4 +63,18 @@ func fsliceEqual(a, b [][]float64) bool {
 	}
 
 	return true
+}
+
+func BenchmarkImport(b *testing.B) {
+	var (
+		f = "data/bus-stops.csv"
+		i = NewImporter()
+	)
+
+	b.ResetTimer()
+
+	_, e := i.Import(f, 4, 5, 15000)
+	if e != nil {
+		b.Errorf("Error importing data: %s", e.Error())
+	}
 }

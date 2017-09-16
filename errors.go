@@ -11,4 +11,5 @@ var (
 	ErrZeroMinpts     = errors.New("MinPts cannot be 0")
 	ErrZeroWorkers    = errors.New("Number of workers cannot be less than 0")
 	ErrZeroXi         = errors.New("Xi cannot be 0")
+	ErrInvalidRange   = errors.New("Range is invalid")
 )

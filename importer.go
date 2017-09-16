@@ -2,7 +2,6 @@ package clusters
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/csv"
 	"io"
 	"os"
@@ -16,7 +15,11 @@ func NewImporter() *Importer {
 	return &Importer{}
 }
 
-func (i *Importer) Import(file string) ([][]float64, error) {
+func (i *Importer) Import(file string, start, end, size int) ([][]float64, error) {
+	if start < 0 || end < 0 || start > end {
+		return [][]float64{}, ErrInvalidRange
+	}
+
 	f, err := os.Open(file)
 	if err != nil {
 		return [][]float64{}, err
@@ -24,22 +27,14 @@ func (i *Importer) Import(file string) ([][]float64, error) {
 
 	defer f.Close()
 
-	b := bufio.NewReader(f)
-
-	c, err := i.lineCount(bufio.NewReader(b))
-	if err != nil {
-		return [][]float64{}, err
-	}
-
-	f.Seek(0, 0)
-	b.Reset(f)
-
 	var (
-		d = make([][]float64, c)
-		r = csv.NewReader(b)
-		k = 0
+		d = make([][]float64, 0, size)
+		r = csv.NewReader(bufio.NewReader(f))
+		s = end - start + 1
+		g []float64
 	)
 
+Main:
 	for {
 		record, err := r.Read()
 
@@ -49,39 +44,19 @@ func (i *Importer) Import(file string) ([][]float64, error) {
 			return [][]float64{}, err
 		}
 
-		d[k] = make([]float64, 0, len(record))
+		g = make([]float64, 0, s)
 
-		for j, _ := range record {
+		for j := start; j <= end; j++ {
 			f, err := strconv.ParseFloat(record[j], 64)
 			if err == nil {
-				d[k] = append(d[k], f)
+				g = append(g, f)
 			} else {
-				return [][]float64{}, err
+				continue Main
 			}
 		}
 
-		k++
+		d = append(d, g)
 	}
 
 	return d, nil
-}
-
-func (*Importer) lineCount(r *bufio.Reader) (int, error) {
-	var (
-		buf     = make([]byte, 32*1024)
-		count   = 0
-		lineSep = []byte{'\n'}
-	)
-
-	for {
-		c, err := r.Read(buf)
-		count += bytes.Count(buf[:c], lineSep)
-
-		switch err {
-		case io.EOF:
-			return count, nil
-		default:
-			return count, err
-		}
-	}
 }

@@ -19,8 +19,8 @@ type dbscanClusterer struct {
 	j          chan *rangeJob
 	m          *sync.Mutex
 	w          *sync.WaitGroup
-	p          []float64
 	r          *[]int
+	p          []float64
 
 	// visited points
 	v []bool
