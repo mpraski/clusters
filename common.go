@@ -2,6 +2,10 @@ package clusters
 
 import (
 	"container/heap"
+	"math/rand"
+	"sync"
+
+	"gonum.org/v1/gonum/floats"
 )
 
 // struct denoting start and end indices of database portion to be scanned for nearest neighbours by workers in DBSCAN and OPTICS
@@ -62,4 +66,57 @@ func (pq *priorityQueue) Update(item *pItem, value int, priority float64) {
 	item.v = value
 	item.p = priority
 	heap.Fix(pq, item.i)
+}
+
+func wk(data [][]float64, centroids [][]float64, mapping []int) float64 {
+	var (
+		l  = float64(2 * len(data[0]))
+		wk = make([]float64, len(centroids))
+	)
+
+	for i := 0; i < len(mapping); i++ {
+		wk[mapping[i]-1] += EuclideanDistanceSquared(centroids[mapping[i]-1], data[i]) / l
+	}
+
+	return floats.Sum(wk)
+}
+
+func bounds(data [][]float64) []*[2]float64 {
+	var (
+		wg sync.WaitGroup
+
+		l = len(data[0])
+		r = make([]*[2]float64, l)
+	)
+
+	for i := 0; i < l; i++ {
+		r[i] = &[2]float64{
+			data[0][i],
+			data[0][i],
+		}
+	}
+
+	wg.Add(l)
+
+	for i := 0; i < l; i++ {
+		go func(n int) {
+			defer wg.Done()
+
+			for j := 0; j < len(data); j++ {
+				if data[j][n] < r[n][0] {
+					r[n][0] = data[j][n]
+				} else if data[j][n] > r[n][1] {
+					r[n][1] = data[j][n]
+				}
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	return r
+}
+
+func uniform(data *[2]float64) float64 {
+	return rand.Float64()*(data[1]-data[0]) + data[0]
 }

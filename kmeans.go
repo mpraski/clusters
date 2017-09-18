@@ -1,6 +1,7 @@
 package clusters
 
 import (
+	"errors"
 	"math"
 	"math/rand"
 	"sync"
@@ -106,6 +107,52 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 	c.mu.Unlock()
 
 	return nil
+}
+
+func (c *kmeansClusterer) Test(data [][]float64, args ...interface{}) (*TestResult, error) {
+	if len(data) == 0 {
+		return nil, ErrEmptySet
+	}
+
+	clusters, ok := args[0].(int)
+	if !ok {
+		return nil, errors.New("Argument #0 is invalid")
+	}
+
+	var (
+		size   = len(data)
+		bounds = bounds(data)
+		wks    = make([]float64, clusters)
+		wkbs   = make([]float64, clusters)
+		sk     = make([]float64, clusters)
+		one    = make([]float64, clusters)
+		bwkbs  = make([]float64, clusters)
+	)
+
+	for i := 0; i < clusters; i++ {
+		c.Learn(data)
+
+		wks[i] = math.Log(wk(c.d, c.m, c.a))
+
+		for j := 0; j < clusters; j++ {
+			c.Learn(c.buildRandomizedSet(size, bounds))
+
+			bwkbs[j] = math.Log(wk(c.d, c.m, c.a))
+			one[j] = 1
+		}
+
+		wkbs[i] = floats.Sum(bwkbs) / float64(clusters)
+
+		floats.Scale(wkbs[i], one)
+		floats.Sub(bwkbs, one)
+		floats.Mul(bwkbs, bwkbs)
+
+		sk[i] = math.Sqrt(floats.Sum(bwkbs) / float64(clusters))
+	}
+
+	floats.Scale(math.Sqrt(1+(1/float64(clusters))), sk)
+
+	return nil, nil
 }
 
 func (c *kmeansClusterer) Sizes() []int {
@@ -323,4 +370,21 @@ func (c *kmeansClusterer) check() {
 	}
 
 	c.oldchanges = c.changes
+}
+
+func (c *kmeansClusterer) buildRandomizedSet(size int, bounds []*[2]float64) [][]float64 {
+	var (
+		l = len(bounds)
+		r = make([][]float64, size)
+	)
+
+	for i := 0; i < size; i++ {
+		r[i] = make([]float64, l)
+
+		for j := 0; j < l; j++ {
+			r[i][j] = uniform(bounds[j])
+		}
+	}
+
+	return r
 }

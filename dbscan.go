@@ -102,6 +102,14 @@ func (c *dbscanClusterer) Learn(data [][]float64) error {
 	return nil
 }
 
+func (c *dbscanClusterer) Test(data [][]float64, args ...interface{}) (*TestResult, error) {
+	if len(data) == 0 {
+		return nil, ErrEmptySet
+	}
+
+	return nil, nil
+}
+
 func (c *dbscanClusterer) Sizes() []int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

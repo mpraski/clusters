@@ -1,6 +1,8 @@
 package clusters
 
 import (
+	"math"
+
 	"gonum.org/v1/gonum/floats"
 )
 
@@ -23,10 +25,16 @@ type SCEvent struct {
 	Observation   []float64
 }
 
-/* Clusterer denotes a single operation of learning
+/* TestResult represents output of a test performed to measure quality of an algorithm. */
+type TestResult struct {
+	clusters, expected int
+}
+
+/* Clusterer denotes a operations of learning and testing
  * common for both Hard and Soft clusterers */
 type Clusterer interface {
-	Learn(data [][]float64) error
+	Learn([][]float64) error
+	Test([][]float64, ...interface{}) (*TestResult, error)
 }
 
 /* HardClusterer defines a set of operations for hard clustering algorithms */
@@ -79,5 +87,9 @@ type SoftClusterer interface {
 var (
 	EuclideanDistance = func(a, b []float64) float64 {
 		return floats.Distance(a, b, 2)
+	}
+
+	EuclideanDistanceSquared = func(a, b []float64) float64 {
+		return math.Pow(floats.Distance(a, b, 2), 2)
 	}
 )

@@ -8,14 +8,18 @@ import (
 	"strconv"
 )
 
-type Importer struct {
+type Importer interface {
+	Import(file string, start, end int) ([][]float64, error)
 }
 
-func NewImporter() *Importer {
-	return &Importer{}
+type csvImporter struct {
 }
 
-func (i *Importer) Import(file string, start, end, size int) ([][]float64, error) {
+func NewCsvImporter() Importer {
+	return &csvImporter{}
+}
+
+func (i *csvImporter) Import(file string, start, end int) ([][]float64, error) {
 	if start < 0 || end < 0 || start > end {
 		return [][]float64{}, ErrInvalidRange
 	}
@@ -28,7 +32,7 @@ func (i *Importer) Import(file string, start, end, size int) ([][]float64, error
 	defer f.Close()
 
 	var (
-		d = make([][]float64, 0, size)
+		d = make([][]float64, 0)
 		r = csv.NewReader(bufio.NewReader(f))
 		s = end - start + 1
 		g []float64

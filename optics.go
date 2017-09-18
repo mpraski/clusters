@@ -135,6 +135,14 @@ func (c *opticsClusterer) Learn(data [][]float64) error {
 	return nil
 }
 
+func (c *opticsClusterer) Test(data [][]float64, args ...interface{}) (*TestResult, error) {
+	if len(data) == 0 {
+		return nil, ErrEmptySet
+	}
+
+	return nil, nil
+}
+
 func (c *opticsClusterer) Sizes() []int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

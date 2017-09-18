@@ -10,11 +10,11 @@ const TOLERANCE = 0.000001
 func TestImportedLoadDataOfCorrectLengh(t *testing.T) {
 	var (
 		f = "data/test.csv"
-		i = NewImporter()
+		i = NewCsvImporter()
 		s = 3
 	)
 
-	d, e := i.Import(f, 0, 2, 3)
+	d, e := i.Import(f, 0, 2)
 	if e != nil {
 		t.Errorf("Error importing data: %s", e.Error())
 	}
@@ -27,7 +27,7 @@ func TestImportedLoadDataOfCorrectLengh(t *testing.T) {
 func TestImportedLoadCorrectData(t *testing.T) {
 	var (
 		f = "data/test.csv"
-		i = NewImporter()
+		i = NewCsvImporter()
 		s = [][]float64{
 			[]float64{0.1, 0.2, 0.3},
 			[]float64{0.4, 0.5, 0.6},
@@ -35,7 +35,7 @@ func TestImportedLoadCorrectData(t *testing.T) {
 		}
 	)
 
-	d, e := i.Import(f, 0, 2, 3)
+	d, e := i.Import(f, 0, 2)
 	if e != nil {
 		t.Errorf("Error importing data: %s", e.Error())
 	}
@@ -68,12 +68,12 @@ func fsliceEqual(a, b [][]float64) bool {
 func BenchmarkImport(b *testing.B) {
 	var (
 		f = "data/bus-stops.csv"
-		i = NewImporter()
+		i = NewCsvImporter()
 	)
 
 	b.ResetTimer()
 
-	_, e := i.Import(f, 4, 5, 15000)
+	_, e := i.Import(f, 4, 5)
 	if e != nil {
 		b.Errorf("Error importing data: %s", e.Error())
 	}
