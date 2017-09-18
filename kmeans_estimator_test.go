@@ -4,9 +4,10 @@ import (
 	"testing"
 )
 
-func TestKmeansClusterNumerMatches(t *testing.T) {
+func TestKmeansEstimator(t *testing.T) {
 	const (
-		C = 8
+		C = 10
+		E = 1
 	)
 
 	var (
@@ -19,16 +20,17 @@ func TestKmeansClusterNumerMatches(t *testing.T) {
 		t.Errorf("Error importing data: %s\n", e.Error())
 	}
 
-	c, e := KMeans(1000, C, EuclideanDistance)
+	c, e := KMeansEstimator(1000, C, EuclideanDistance)
 	if e != nil {
 		t.Errorf("Error initializing kmeans clusterer: %s\n", e.Error())
 	}
 
-	if e = c.Learn(d); e != nil {
-		t.Errorf("Error learning data: %s\n", e.Error())
+	r, e := c.Estimate(d)
+	if e != nil {
+		t.Errorf("Error running test: %s\n", e.Error())
 	}
 
-	if len(c.Sizes()) != C {
-		t.Errorf("Number of clusters does not match: %d vs %d\n", len(c.Sizes()), C)
+	if r != E {
+		t.Errorf("Estimated number of clusters should be %d, it s %d\n", E, r)
 	}
 }

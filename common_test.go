@@ -101,19 +101,19 @@ func TestBounds(t *testing.T) {
 	bounds := bounds(d)
 
 	if len(bounds) != 3 {
-		t.Errorf("Mismatched bounds array length: %d vs %d", len(bounds), l)
+		t.Errorf("Mismatched bounds array length: %d vs %d\n", len(bounds), l)
 	}
 
 	if bounds[0][0] != 0.1 || bounds[0][1] != 0.7 {
-		t.Errorf("Invalid bounds for feature #0")
+		t.Error("Invalid bounds for feature #0")
 	}
 
 	if bounds[1][0] != 0.2 || bounds[1][1] != 0.8 {
-		t.Errorf("Invalid bounds for feature #1")
+		t.Error("Invalid bounds for feature #1")
 	}
 
 	if bounds[2][0] != 0.3 || bounds[2][1] != 0.9 {
-		t.Errorf("Invalid bounds for feature #2")
+		t.Error("Invalid bounds for feature #2")
 	}
 }
 
@@ -129,7 +129,7 @@ func TestUniform(t *testing.T) {
 	for i := 0; i < l; i++ {
 		u := uniform(d)
 		if u < 0 || u > 10 {
-			t.Errorf("Unformly distributed variable out of bounds")
+			t.Error("Unformly distributed variable out of bounds")
 		}
 	}
 }

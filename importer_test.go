@@ -16,11 +16,11 @@ func TestImportedLoadDataOfCorrectLengh(t *testing.T) {
 
 	d, e := i.Import(f, 0, 2)
 	if e != nil {
-		t.Errorf("Error importing data: %s", e.Error())
+		t.Errorf("Error importing data: %s\n", e.Error())
 	}
 
 	if s != len(d) {
-		t.Errorf("Imported data size mismatch: %d vs %d", s, len(d))
+		t.Errorf("Imported data size mismatch: %d vs %d\n", s, len(d))
 	}
 }
 
@@ -37,11 +37,11 @@ func TestImportedLoadCorrectData(t *testing.T) {
 
 	d, e := i.Import(f, 0, 2)
 	if e != nil {
-		t.Errorf("Error importing data: %s", e.Error())
+		t.Errorf("Error importing data: %s\n", e.Error())
 	}
 
 	if !fsliceEqual(d, s) {
-		t.Error("Imported data mismatch: %v vs %v", d, s)
+		t.Error("Imported data mismatch: %v vs %v\n", d, s)
 	}
 }
 
@@ -75,6 +75,6 @@ func BenchmarkImport(b *testing.B) {
 
 	_, e := i.Import(f, 4, 5)
 	if e != nil {
-		b.Errorf("Error importing data: %s", e.Error())
+		b.Errorf("Error importing data: %s\n", e.Error())
 	}
 }

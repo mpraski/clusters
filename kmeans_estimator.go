@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	"sync"
 	"time"
 
 	"gonum.org/v1/gonum/floats"
@@ -16,14 +15,8 @@ type kmeansEstimator struct {
 	// variables keeping count of changes of points' membership every iteration. User as a stopping condition.
 	changes, oldchanges, counter, threshold int
 
-	// For online learning only
-	alpha     float64
-	dimension int
-
 	distance DistanceFunc
 
-	// slices holding the cluster mapping and sizes. Access is synchronized to avoid read during computation.
-	mu   sync.RWMutex
 	a, b []int
 
 	// slices holding values of centroids of each clusters
@@ -75,25 +68,17 @@ func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 	)
 
 	for i := 0; i < c.max; i++ {
-		c.number = i
+		c.number = i + 1
 
 		c.learn(data)
 
-		fmt.Printf("Learned data for i = %d\n", i)
-
 		wks[i] = math.Log(wk(c.d, c.m, c.a))
-
-		fmt.Printf("Computed wks for i = %d\n", i)
 
 		for j := 0; j < c.max; j++ {
 			c.learn(c.buildRandomizedSet(size, bounds))
 
-			fmt.Printf("Learned randomized dataset for i = %d, j = %d\n", i, j)
-
 			bwkbs[j] = math.Log(wk(c.d, c.m, c.a))
 			one[j] = 1
-
-			fmt.Printf("Computed bwkbs for i = %d, j = %d\n", i, j)
 		}
 
 		wkbs[i] = floats.Sum(bwkbs) / float64(c.max)
@@ -103,16 +88,16 @@ func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 		floats.Mul(bwkbs, bwkbs)
 
 		sk[i] = math.Sqrt(floats.Sum(bwkbs) / float64(c.max))
-
-		fmt.Printf("WKBS: %v\n", wkbs)
-		fmt.Printf("SK: %v\n", sk)
 	}
 
 	floats.Scale(math.Sqrt(1+(1/float64(c.max))), sk)
 
+	fmt.Printf("WKBS: %v\n", wkbs)
+	fmt.Printf("SK: %v\n", sk)
+
 	for i := 0; i < c.max-1; i++ {
 		if wkbs[i] >= wkbs[i+1]-sk[i+1] {
-			estimated = i
+			estimated = i + 1
 			break
 		}
 	}
@@ -123,8 +108,6 @@ func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 // private
 
 func (c *kmeansEstimator) learn(data [][]float64) {
-	c.mu.Lock()
-
 	c.d = data
 
 	c.a = make([]int, len(data))
@@ -143,8 +126,6 @@ func (c *kmeansEstimator) learn(data [][]float64) {
 	}
 
 	c.n = nil
-
-	c.mu.Unlock()
 }
 
 func (c *kmeansEstimator) initializeMeansWithData() {
@@ -188,19 +169,6 @@ func (c *kmeansEstimator) initializeMeansWithData() {
 
 	for i := 0; i < c.number; i++ {
 		c.n[i] = make([]float64, len(c.m[0]))
-	}
-}
-
-func (c *kmeansEstimator) initializeMeans() {
-	c.m = make([][]float64, c.number)
-
-	rand.Seed(time.Now().UTC().Unix())
-
-	for i := 0; i < c.number; i++ {
-		c.m[i] = make([]float64, c.dimension)
-		for j := 0; j < c.dimension; j++ {
-			c.m[i][j] = 10 * (rand.Float64() - 0.5)
-		}
 	}
 }
 
