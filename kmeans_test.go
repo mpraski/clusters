@@ -36,6 +36,7 @@ func TestKmeansClusterNumerMatches(t *testing.T) {
 /*func TestKmeansUsingGapStatistic(t *testing.T) {
 	const (
 		C         = 8
+		TEST      = 10
 		THRESHOLD = 2
 	)
 
@@ -54,7 +55,7 @@ func TestKmeansClusterNumerMatches(t *testing.T) {
 		t.Errorf("Error initializing kmeans clusterer: %s", e.Error())
 	}
 
-	r, e := c.Test(d, 20)
+	r, e := c.Test(d, TEST)
 	if e != nil {
 		t.Errorf("Error running test: %s", e.Error())
 	}

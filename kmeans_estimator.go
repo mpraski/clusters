@@ -1,0 +1,273 @@
+package clusters
+
+import (
+	"fmt"
+	"math"
+	"math/rand"
+	"sync"
+	"time"
+
+	"gonum.org/v1/gonum/floats"
+)
+
+type kmeansEstimator struct {
+	iterations, number, max int
+
+	// variables keeping count of changes of points' membership every iteration. User as a stopping condition.
+	changes, oldchanges, counter, threshold int
+
+	// For online learning only
+	alpha     float64
+	dimension int
+
+	distance DistanceFunc
+
+	// slices holding the cluster mapping and sizes. Access is synchronized to avoid read during computation.
+	mu   sync.RWMutex
+	a, b []int
+
+	// slices holding values of centroids of each clusters
+	m, n [][]float64
+
+	// dataset
+	d [][]float64
+}
+
+func KMeansEstimator(iterations, clusters int, distance DistanceFunc) (Estimator, error) {
+	if iterations < 1 {
+		return nil, ErrZeroIterations
+	}
+
+	if clusters < 2 {
+		return nil, ErrOneCluster
+	}
+
+	var d DistanceFunc
+	{
+		if distance != nil {
+			d = distance
+		} else {
+			d = EuclideanDistance
+		}
+	}
+
+	return &kmeansEstimator{
+		iterations: iterations,
+		max:        clusters,
+		distance:   d,
+	}, nil
+}
+
+func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
+	if len(data) == 0 {
+		return 0, ErrEmptySet
+	}
+
+	var (
+		estimated = 0
+		size      = len(data)
+		bounds    = bounds(data)
+		wks       = make([]float64, c.max)
+		wkbs      = make([]float64, c.max)
+		sk        = make([]float64, c.max)
+		one       = make([]float64, c.max)
+		bwkbs     = make([]float64, c.max)
+	)
+
+	for i := 0; i < c.max; i++ {
+		c.number = i
+
+		c.learn(data)
+
+		fmt.Printf("Learned data for i = %d\n", i)
+
+		wks[i] = math.Log(wk(c.d, c.m, c.a))
+
+		fmt.Printf("Computed wks for i = %d\n", i)
+
+		for j := 0; j < c.max; j++ {
+			c.learn(c.buildRandomizedSet(size, bounds))
+
+			fmt.Printf("Learned randomized dataset for i = %d, j = %d\n", i, j)
+
+			bwkbs[j] = math.Log(wk(c.d, c.m, c.a))
+			one[j] = 1
+
+			fmt.Printf("Computed bwkbs for i = %d, j = %d\n", i, j)
+		}
+
+		wkbs[i] = floats.Sum(bwkbs) / float64(c.max)
+
+		floats.Scale(wkbs[i], one)
+		floats.Sub(bwkbs, one)
+		floats.Mul(bwkbs, bwkbs)
+
+		sk[i] = math.Sqrt(floats.Sum(bwkbs) / float64(c.max))
+
+		fmt.Printf("WKBS: %v\n", wkbs)
+		fmt.Printf("SK: %v\n", sk)
+	}
+
+	floats.Scale(math.Sqrt(1+(1/float64(c.max))), sk)
+
+	for i := 0; i < c.max-1; i++ {
+		if wkbs[i] >= wkbs[i+1]-sk[i+1] {
+			estimated = i
+			break
+		}
+	}
+
+	return estimated, nil
+}
+
+// private
+
+func (c *kmeansEstimator) learn(data [][]float64) {
+	c.mu.Lock()
+
+	c.d = data
+
+	c.a = make([]int, len(data))
+	c.b = make([]int, c.number)
+
+	c.counter = 0
+	c.threshold = CHANGES_THRESHOLD
+	c.changes = 0
+	c.oldchanges = 0
+
+	c.initializeMeansWithData()
+
+	for i := 0; i < c.iterations && c.counter != c.threshold; i++ {
+		c.run()
+		c.check()
+	}
+
+	c.n = nil
+
+	c.mu.Unlock()
+}
+
+func (c *kmeansEstimator) initializeMeansWithData() {
+	c.m = make([][]float64, c.number)
+	c.n = make([][]float64, c.number)
+
+	rand.Seed(time.Now().UTC().Unix())
+
+	var (
+		k          int
+		s, t, l, f float64
+		d          []float64 = make([]float64, len(c.d))
+	)
+
+	c.m[0] = c.d[rand.Intn(len(c.d)-1)]
+
+	for i := 1; i < c.number; i++ {
+		s = 0
+		t = 0
+		for j := 0; j < len(c.d); j++ {
+
+			l = c.distance(c.m[0], c.d[j])
+			for g := 1; g < i; g++ {
+				if f = c.distance(c.m[g], c.d[j]); f < l {
+					l = f
+				}
+			}
+
+			d[j] = math.Pow(l, 2)
+			s += d[j]
+		}
+
+		t = rand.Float64() * s
+		k = 0
+		for s = d[0]; s < t; s += d[k] {
+			k++
+		}
+
+		c.m[i] = c.d[k]
+	}
+
+	for i := 0; i < c.number; i++ {
+		c.n[i] = make([]float64, len(c.m[0]))
+	}
+}
+
+func (c *kmeansEstimator) initializeMeans() {
+	c.m = make([][]float64, c.number)
+
+	rand.Seed(time.Now().UTC().Unix())
+
+	for i := 0; i < c.number; i++ {
+		c.m[i] = make([]float64, c.dimension)
+		for j := 0; j < c.dimension; j++ {
+			c.m[i][j] = 10 * (rand.Float64() - 0.5)
+		}
+	}
+}
+
+func (c *kmeansEstimator) run() {
+	var (
+		l, k, n int = len(c.m[0]), 0, 0
+		m, d    float64
+	)
+
+	for i := 0; i < c.number; i++ {
+		c.b[i] = 0
+	}
+
+	for i := 0; i < len(c.d); i++ {
+		m = c.distance(c.d[i], c.m[0])
+		n = 0
+
+		for j := 1; j < c.number; j++ {
+			if d = c.distance(c.d[i], c.m[j]); d < m {
+				m = d
+				n = j
+			}
+		}
+
+		k = n + 1
+
+		if c.a[i] != k {
+			c.changes++
+		}
+
+		c.a[i] = k
+		c.b[n]++
+
+		floats.Add(c.n[n], c.d[i])
+	}
+
+	for i := 0; i < c.number; i++ {
+		floats.Scale(1/float64(c.b[i]), c.n[i])
+
+		for j := 0; j < l; j++ {
+			c.m[i][j] = c.n[i][j]
+			c.n[i][j] = 0
+		}
+	}
+}
+
+func (c *kmeansEstimator) check() {
+	if c.changes == c.oldchanges {
+		c.counter++
+	}
+
+	c.oldchanges = c.changes
+}
+
+func (c *kmeansEstimator) buildRandomizedSet(size int, bounds []*[2]float64) [][]float64 {
+	var (
+		l = len(bounds)
+		r = make([][]float64, size)
+	)
+
+	for i := 0; i < size; i++ {
+		r[i] = make([]float64, l)
+
+		for j := 0; j < l; j++ {
+			r[i][j] = uniform(bounds[j])
+		}
+	}
+
+	return r
+}

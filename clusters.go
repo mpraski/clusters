@@ -1,8 +1,6 @@
 package clusters
 
 import (
-	"math"
-
 	"gonum.org/v1/gonum/floats"
 )
 
@@ -30,11 +28,10 @@ type TestResult struct {
 	clusters, expected int
 }
 
-/* Clusterer denotes a operations of learning and testing
+/* Clusterer denotes the operation of learning
  * common for both Hard and Soft clusterers */
 type Clusterer interface {
 	Learn([][]float64) error
-	Test([][]float64, ...interface{}) (*TestResult, error)
 }
 
 /* HardClusterer defines a set of operations for hard clustering algorithms */
@@ -84,12 +81,19 @@ type SoftClusterer interface {
 	Clusterer
 }
 
+type Estimator interface {
+
+	/* Estimates the numer of clusters */
+	Estimate([][]float64) (int, error)
+}
+
 var (
 	EuclideanDistance = func(a, b []float64) float64 {
 		return floats.Distance(a, b, 2)
 	}
 
 	EuclideanDistanceSquared = func(a, b []float64) float64 {
-		return math.Pow(floats.Distance(a, b, 2), 2)
+		t := floats.Distance(a, b, 2)
+		return t * t
 	}
 )
