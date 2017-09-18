@@ -1,7 +1,6 @@
 package clusters
 
 import (
-	"math"
 	"testing"
 )
 
@@ -34,7 +33,7 @@ func TestKmeansClusterNumerMatches(t *testing.T) {
 	}
 }
 
-func TestKmeansUsingGapStatistic(t *testing.T) {
+/*func TestKmeansUsingGapStatistic(t *testing.T) {
 	const (
 		C         = 8
 		THRESHOLD = 2
@@ -63,4 +62,4 @@ func TestKmeansUsingGapStatistic(t *testing.T) {
 	if math.Abs(float64(r.clusters-r.expected)) > THRESHOLD {
 		t.Errorf("Discrepancy between numer of clusters and expectation: %d vs %d", r.clusters, r.expected)
 	}
-}
+}*/

@@ -85,3 +85,51 @@ func TestQueueReturnsInPriorityOrderAfterUpdate(t *testing.T) {
 		t.Error("Queue is not empty")
 	}
 }
+
+func TestBounds(t *testing.T) {
+	var (
+		f = "data/test.csv"
+		i = NewCsvImporter()
+		l = 3
+	)
+
+	d, e := i.Import(f, 0, 2)
+	if e != nil {
+		t.Errorf("Error importing data: %s", e.Error())
+	}
+
+	bounds := bounds(d)
+
+	if len(bounds) != 3 {
+		t.Errorf("Mismatched bounds array length: %d vs %d", len(bounds), l)
+	}
+
+	if bounds[0][0] != 0.1 || bounds[0][1] != 0.7 {
+		t.Errorf("Invalid bounds for feature #0")
+	}
+
+	if bounds[1][0] != 0.2 || bounds[1][1] != 0.8 {
+		t.Errorf("Invalid bounds for feature #1")
+	}
+
+	if bounds[2][0] != 0.3 || bounds[2][1] != 0.9 {
+		t.Errorf("Invalid bounds for feature #2")
+	}
+}
+
+func TestUniform(t *testing.T) {
+	var (
+		l = 100
+		d = &[2]float64{
+			0,
+			10,
+		}
+	)
+
+	for i := 0; i < l; i++ {
+		u := uniform(d)
+		if u < 0 || u > 10 {
+			t.Errorf("Unformly distributed variable out of bounds")
+		}
+	}
+}
