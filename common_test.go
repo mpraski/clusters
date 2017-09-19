@@ -95,7 +95,7 @@ func TestBounds(t *testing.T) {
 
 	d, e := i.Import(f, 0, 2)
 	if e != nil {
-		t.Errorf("Error importing data: %s", e.Error())
+		t.Errorf("Error importing data: %s\n", e.Error())
 	}
 
 	bounds := bounds(d)

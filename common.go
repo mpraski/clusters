@@ -4,8 +4,6 @@ import (
 	"container/heap"
 	"math/rand"
 	"sync"
-
-	"gonum.org/v1/gonum/floats"
 )
 
 // struct denoting start and end indices of database portion to be scanned for nearest neighbours by workers in DBSCAN and OPTICS
@@ -66,19 +64,6 @@ func (pq *priorityQueue) Update(item *pItem, value int, priority float64) {
 	item.v = value
 	item.p = priority
 	heap.Fix(pq, item.i)
-}
-
-func wk(data [][]float64, centroids [][]float64, mapping []int) float64 {
-	var (
-		l  = float64(2 * len(data[0]))
-		wk = make([]float64, len(centroids))
-	)
-
-	for i := 0; i < len(mapping); i++ {
-		wk[mapping[i]-1] += EuclideanDistanceSquared(centroids[mapping[i]-1], data[i]) / l
-	}
-
-	return floats.Sum(wk)
 }
 
 func bounds(data [][]float64) []*[2]float64 {

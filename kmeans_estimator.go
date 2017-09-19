@@ -1,7 +1,6 @@
 package clusters
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -72,12 +71,12 @@ func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 
 		c.learn(data)
 
-		wks[i] = math.Log(wk(c.d, c.m, c.a))
+		wks[i] = math.Log(c.wk(c.d, c.m, c.a))
 
 		for j := 0; j < c.max; j++ {
 			c.learn(c.buildRandomizedSet(size, bounds))
 
-			bwkbs[j] = math.Log(wk(c.d, c.m, c.a))
+			bwkbs[j] = math.Log(c.wk(c.d, c.m, c.a))
 			one[j] = 1
 		}
 
@@ -92,9 +91,6 @@ func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 
 	floats.Scale(math.Sqrt(1+(1/float64(c.max))), sk)
 
-	fmt.Printf("WKBS: %v\n", wkbs)
-	fmt.Printf("SK: %v\n", sk)
-
 	for i := 0; i < c.max-1; i++ {
 		if wkbs[i] >= wkbs[i+1]-sk[i+1] {
 			estimated = i + 1
@@ -106,7 +102,6 @@ func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 }
 
 // private
-
 func (c *kmeansEstimator) learn(data [][]float64) {
 	c.d = data
 
@@ -124,8 +119,6 @@ func (c *kmeansEstimator) learn(data [][]float64) {
 		c.run()
 		c.check()
 	}
-
-	c.n = nil
 }
 
 func (c *kmeansEstimator) initializeMeansWithData() {
@@ -221,6 +214,19 @@ func (c *kmeansEstimator) check() {
 	}
 
 	c.oldchanges = c.changes
+}
+
+func (c *kmeansEstimator) wk(data [][]float64, centroids [][]float64, mapping []int) float64 {
+	var (
+		l  = float64(2 * len(data[0]))
+		wk = make([]float64, len(centroids))
+	)
+
+	for i := 0; i < len(mapping); i++ {
+		wk[mapping[i]-1] += EuclideanDistanceSquared(centroids[mapping[i]-1], data[i]) / l
+	}
+
+	return floats.Sum(wk)
 }
 
 func (c *kmeansEstimator) buildRandomizedSet(size int, bounds []*[2]float64) [][]float64 {

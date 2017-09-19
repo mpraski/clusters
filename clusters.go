@@ -93,7 +93,15 @@ var (
 	}
 
 	EuclideanDistanceSquared = func(a, b []float64) float64 {
-		t := floats.Distance(a, b, 2)
-		return t * t
+		var (
+			s, t float64
+		)
+
+		for i, _ := range a {
+			t = a[i] - b[i]
+			s += t * t
+		}
+
+		return s
 	}
 )
