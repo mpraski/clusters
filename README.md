@@ -1,3 +1,3 @@
 # clusters
 
-A go utility for fast clustering of datasets and making prediction about observations. It provides clean API for implementing different algorithms, as well as online learning.
+Go implementations of several clustering algoritms (k-means++, DBSCAN, OPTICS), as well as utilities for importing data and estimating optimal number of clusters.
