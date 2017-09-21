@@ -1,7 +1,7 @@
 package clusters
 
 import (
-	"gonum.org/v1/gonum/floats"
+	"math"
 )
 
 type DistanceFunc func(a, b []float64) float64
@@ -89,7 +89,16 @@ type Estimator interface {
 
 var (
 	EuclideanDistance = func(a, b []float64) float64 {
-		return floats.Distance(a, b, 2)
+		var (
+			s, t float64
+		)
+
+		for i, _ := range a {
+			t = a[i] - b[i]
+			s += t * t
+		}
+
+		return math.Sqrt(s)
 	}
 
 	EuclideanDistanceSquared = func(a, b []float64) float64 {
