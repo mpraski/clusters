@@ -24,8 +24,8 @@ var data [][]float64
 var observation []float64
 
 // Create a new KMeans++ clusterer with 1000 iterations, 
-// 8 clusters and default (EuclideanDistance) distance measurement
-c, e := clusters.KMeans(1000, 8, nil)
+// 8 clusters and default distance measurement function of type func([]float64, []float64) float64)
+c, e := clusters.KMeans(1000, 8, clusters.EuclideanDistance)
 if e != nil {
 	panic(e)
 }
@@ -49,7 +49,7 @@ var data [][]float64
 
 // Create a new KMeans++ estimator with 1000 iterations, 
 // a maximum of 8 clusters and default (EuclideanDistance) distance measurement
-c, e := KMeansEstimator(1000, 8, EuclideanDistance)
+c, e := clusters.KMeansEstimator(1000, 8, clusters.EuclideanDistance)
 if e != nil {
 	panic(e)
 }
