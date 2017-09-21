@@ -38,6 +38,10 @@ if e = c.Learn(data); e != nil {
 fmt.Printf("Clustered set into %d\n", c3.Sizes())
 
 fmt.Printf("Assigned observation %v to cluster %d\n", observation, c.Predict(observation))
+
+for index, number := range c.Guesses() {
+	fmt.Printf("Assigned data point %v to cluster %d\n", data[index], number)
+}
 ```
 
 Algorithms currenly supported are KMeans++, DBSCAN and OPTICS.
@@ -87,4 +91,3 @@ Soon to come.
 ## Licence
 
 MIT
-```
