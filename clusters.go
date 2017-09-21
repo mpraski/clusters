@@ -8,7 +8,7 @@ import (
 
 // DistanceFunc represents a function for measuring distance
 // between n-dimensional vectors.
-type DistanceFunc func(a, b []float64) float64
+type DistanceFunc func([]float64, []float64) float64
 
 // Online represents parameters important for online learning in
 // clustering algorithms.
