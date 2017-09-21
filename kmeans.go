@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	CHANGES_THRESHOLD = 2
+	changesThreshold = 2
 )
 
 type kmeansClusterer struct {
@@ -39,11 +39,11 @@ type kmeansClusterer struct {
 // Implementation of k-means++ algorithm with online learning
 func KMeans(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
 	if iterations < 1 {
-		return nil, ErrZeroIterations
+		return nil, errZeroIterations
 	}
 
 	if clusters < 2 {
-		return nil, ErrOneCluster
+		return nil, errOneCluster
 	}
 
 	var d DistanceFunc
@@ -79,7 +79,7 @@ func (c *kmeansClusterer) WithOnline(o Online) HardClusterer {
 
 func (c *kmeansClusterer) Learn(data [][]float64) error {
 	if len(data) == 0 {
-		return ErrEmptySet
+		return errEmptySet
 	}
 
 	c.mu.Lock()
@@ -90,7 +90,7 @@ func (c *kmeansClusterer) Learn(data [][]float64) error {
 	c.b = make([]int, c.number)
 
 	c.counter = 0
-	c.threshold = CHANGES_THRESHOLD
+	c.threshold = changesThreshold
 	c.changes = 0
 	c.oldchanges = 0
 

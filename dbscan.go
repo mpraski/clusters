@@ -33,15 +33,15 @@ type dbscanClusterer struct {
 // is controlled via workers argument. Passing 0 will result in this number being chosen arbitrarily.
 func DBSCAN(minpts int, eps float64, workers int, distance DistanceFunc) (HardClusterer, error) {
 	if minpts < 1 {
-		return nil, ErrZeroMinpts
+		return nil, errZeroMinpts
 	}
 
 	if workers < 0 {
-		return nil, ErrZeroWorkers
+		return nil, errZeroWorkers
 	}
 
 	if eps <= 0 {
-		return nil, ErrZeroEpsilon
+		return nil, errZeroEpsilon
 	}
 
 	var d DistanceFunc
@@ -71,7 +71,7 @@ func (c *dbscanClusterer) WithOnline(o Online) HardClusterer {
 
 func (c *dbscanClusterer) Learn(data [][]float64) error {
 	if len(data) == 0 {
-		return ErrEmptySet
+		return errEmptySet
 	}
 
 	c.mu.Lock()

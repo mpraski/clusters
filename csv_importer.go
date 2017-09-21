@@ -11,13 +11,13 @@ import (
 type csvImporter struct {
 }
 
-func NewCsvImporter() Importer {
+func CsvImporter() Importer {
 	return &csvImporter{}
 }
 
 func (i *csvImporter) Import(file string, start, end int) ([][]float64, error) {
 	if start < 0 || end < 0 || start > end {
-		return [][]float64{}, ErrInvalidRange
+		return [][]float64{}, errInvalidRange
 	}
 
 	f, err := os.Open(file)

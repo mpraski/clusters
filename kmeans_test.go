@@ -11,7 +11,7 @@ func TestKmeansClusterNumerMatches(t *testing.T) {
 
 	var (
 		f = "data/bus-stops.csv"
-		i = NewCsvImporter()
+		i = CsvImporter()
 	)
 
 	d, e := i.Import(f, 4, 5)

@@ -30,11 +30,11 @@ type kmeansEstimator struct {
 // clustering algorithm
 func KMeansEstimator(iterations, clusters int, distance DistanceFunc) (Estimator, error) {
 	if iterations < 1 {
-		return nil, ErrZeroIterations
+		return nil, errZeroIterations
 	}
 
 	if clusters < 2 {
-		return nil, ErrOneCluster
+		return nil, errOneCluster
 	}
 
 	var d DistanceFunc
@@ -55,7 +55,7 @@ func KMeansEstimator(iterations, clusters int, distance DistanceFunc) (Estimator
 
 func (c *kmeansEstimator) Estimate(data [][]float64) (int, error) {
 	if len(data) == 0 {
-		return 0, ErrEmptySet
+		return 0, errEmptySet
 	}
 
 	var (
@@ -112,7 +112,7 @@ func (c *kmeansEstimator) learn(data [][]float64) {
 	c.b = make([]int, c.number)
 
 	c.counter = 0
-	c.threshold = CHANGES_THRESHOLD
+	c.threshold = changesThreshold
 	c.changes = 0
 	c.oldchanges = 0
 

@@ -10,7 +10,7 @@ const TOLERANCE = 0.000001
 func TestImportedLoadDataOfCorrectLengh(t *testing.T) {
 	var (
 		f = "data/test.csv"
-		i = NewCsvImporter()
+		i = CsvImporter()
 		s = 3
 	)
 
@@ -27,7 +27,7 @@ func TestImportedLoadDataOfCorrectLengh(t *testing.T) {
 func TestImportedLoadCorrectData(t *testing.T) {
 	var (
 		f = "data/test.csv"
-		i = NewCsvImporter()
+		i = CsvImporter()
 		s = [][]float64{
 			[]float64{0.1, 0.2, 0.3},
 			[]float64{0.4, 0.5, 0.6},
@@ -68,7 +68,7 @@ func fsliceEqual(a, b [][]float64) bool {
 func BenchmarkImport(b *testing.B) {
 	var (
 		f = "data/bus-stops.csv"
-		i = NewCsvImporter()
+		i = CsvImporter()
 	)
 
 	b.ResetTimer()

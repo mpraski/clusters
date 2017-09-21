@@ -89,7 +89,7 @@ func TestQueueReturnsInPriorityOrderAfterUpdate(t *testing.T) {
 func TestBounds(t *testing.T) {
 	var (
 		f = "data/test.csv"
-		i = NewCsvImporter()
+		i = CsvImporter()
 		l = 3
 	)
 
