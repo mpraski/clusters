@@ -42,6 +42,37 @@ fmt.Printf("Assigned observation %v to cluster %d\n", observation, c.Predict(obs
 
 Algorithms currenly supported are KMeans++, DBSCAN and OPTICS.
 
+The Estimator interface defines an operation of guessing an optimal number of clusters in a dataset. As of now the KMeansEstimator is implemented using gap statistic and k-means++ as the clustering algorithm (see https://web.stanford.edu/~hastie/Papers/gap.pdf):
+
+```go
+var data [][]float64
+
+// Create a new KMeans++ estimator with 1000 iterations, 
+// a maximum of 8 clusters and default (EuclideanDistance) distance measurement
+c, e := KMeansEstimator(1000, 8, EuclideanDistance)
+if e != nil {
+	panic(e)
+}
+
+r, e := c.Estimate(d)
+if e != nil {
+	panic(e)
+}
+
+fmt.Printf("Estimated number of clusters: %d\n", r)
+
+```
+
+The library also provides an Importer to load data from files (currently the CSV imported is implemented):
+
+```go
+// Import first three columns from data.csv
+d, e := i.Import("data.csv", 0, 2)
+if e != nil {
+	panic(e)
+}
+```
+
 ## Development
 
 The list of project goals include:
