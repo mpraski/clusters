@@ -4,13 +4,56 @@
 
 Go implementations of several clustering algoritms (k-means++, DBSCAN, OPTICS), as well as utilities for importing data and estimating optimal number of clusters.
 
-# The reason
+## The reason
 
 This library was built out of a necessity for a performant and simple clustering utility for Golang. Go, thanks to its several advantages (single binary distrubution, relative performance, growing community) seems to become an attractive alternative to languages commonly used in statistical computations and machine learning. I use part of the robust gonum package to perform optimized vector calculations in tight loops.
 
-# Install
+## Install
 
 If you have Go 1.7+
-    https://github.com/mpraski/clusters
+```bash
+go get github.com/mpraski/clusters
+```
 
+## Usage
 
+The currently supported hard clustering algorithms are represented by the *HardClusterer* interface, which defines several common operations. To show an example we create, train and use a KMeans++ clusterer:
+
+```go
+var data [][]float64
+var observation []float64
+
+// Create a new KMeans++ clusterer with 1000 iterations, 
+// 8 clusters and default (EuclideanDistance) distance measurement
+c, e := clusters.KMeans(1000, 8, nil)
+if e != nil {
+	panic(e)
+}
+
+// Use the data to train the clusterer
+if e = c.Learn(data); e != nil {
+	panic(e)
+}
+
+fmt.Printf("Clustered set into %d\n", c3.Sizes())
+
+fmt.Printf("Assigned observation %v to cluster %d\n", observation, c.Predict(observation))
+```
+
+Algorithms currenly supported are KMeans++, DBSCAN and OPTICS.
+
+## Development
+
+The list of project goals include:
+- [x] Implement commonly used hard clustering algorithms
+- [ ] Implement commonly used soft clustering algorithms
+- [ ] Devise reliable tests of performance and quality of each algorithm
+
+## Benchmarks
+
+Soon to come.
+
+## Licence
+
+MIT
+```
