@@ -35,7 +35,7 @@ if e = c.Learn(data); e != nil {
 	panic(e)
 }
 
-fmt.Printf("Clustered data set into %d\n", c3.Sizes())
+fmt.Printf("Clustered data set into %d\n", c.Sizes())
 
 fmt.Printf("Assigned observation %v to cluster %d\n", observation, c.Predict(observation))
 
@@ -100,7 +100,7 @@ if e != nil {
 	panic(e)
 }
 
-r, e := c.Estimate(d)
+r, e := c.Estimate(data)
 if e != nil {
 	panic(e)
 }
