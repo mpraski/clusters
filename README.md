@@ -35,7 +35,7 @@ if e = c.Learn(data); e != nil {
 	panic(e)
 }
 
-fmt.Printf("Clustered set into %d\n", c3.Sizes())
+fmt.Printf("Clustered data set into %d\n", c3.Sizes())
 
 fmt.Printf("Assigned observation %v to cluster %d\n", observation, c.Predict(observation))
 
@@ -45,6 +45,48 @@ for index, number := range c.Guesses() {
 ```
 
 Algorithms currenly supported are KMeans++, DBSCAN and OPTICS.
+
+Algorithms which support online learning can be trained this way using Online() function, which relies on channel communication to coordinate the process:
+
+```go
+c, e := clusters.KmeansClusterer(1000, 8, clusters.EuclideanDistance)
+if e != nil {
+	panic(e)
+}
+
+c = c.WithOnline(clusters.Online{
+	Alpha:     0.5,
+	Dimension: 4,
+})
+
+var (
+	send   = make(chan []float64)
+	finish = make(chan struct{})
+)
+
+events := c.Online(send, finish)
+
+go func() {
+	for {
+		select {
+		case e := <-events:
+			fmt.Printf("Classified observation %v into cluster: %d\n", e.Observation, e.Cluster)
+		}
+	}
+}()
+
+for i := 0; i < 10000; i++ {
+	point := make([]float64, 4)
+	for j := 0; j < 4; j++ {
+		point[j] = 10 * (rand.Float64() - 0.5)
+	}
+	send <- point
+}
+
+finish <- struct{}{}
+
+fmt.Printf("Clustered data set into %d\n", c.Sizes())
+```
 
 The Estimator interface defines an operation of guessing an optimal number of clusters in a dataset. As of now the KMeansEstimator is implemented using gap statistic and k-means++ as the clustering algorithm (see https://web.stanford.edu/~hastie/Papers/gap.pdf):
 
