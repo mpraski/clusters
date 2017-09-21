@@ -63,7 +63,7 @@ fmt.Printf("Estimated number of clusters: %d\n", r)
 
 ```
 
-The library also provides an Importer to load data from files (currently the CSV imported is implemented):
+The library also provides an Importer to load data from files (currently the CSV importer is implemented):
 
 ```go
 // Import first three columns from data.csv
