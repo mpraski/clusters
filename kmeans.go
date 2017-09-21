@@ -13,7 +13,6 @@ const (
 	CHANGES_THRESHOLD = 2
 )
 
-/* Implementation of k-means++ algorithm with online learning */
 type kmeansClusterer struct {
 	iterations, number int
 
@@ -37,6 +36,7 @@ type kmeansClusterer struct {
 	d [][]float64
 }
 
+// Implementation of k-means++ algorithm with online learning
 func KMeans(iterations, clusters int, distance DistanceFunc) (HardClusterer, error) {
 	if iterations < 1 {
 		return nil, ErrZeroIterations

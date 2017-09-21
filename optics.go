@@ -46,7 +46,8 @@ type opticsClusterer struct {
 	d [][]float64
 }
 
-/* Implementation of OPTICS algorithm with concurrent nearest neighbour computation */
+// Implementation of OPTICS algorithm with concurrent nearest neighbour computation. The number of goroutines acting concurrently
+// is controlled via workers argument. Passing 0 will result in this number being chosen arbitrarily.
 func OPTICS(minpts int, eps, xi float64, workers int, distance DistanceFunc) (HardClusterer, error) {
 	if minpts < 1 {
 		return nil, ErrZeroMinpts

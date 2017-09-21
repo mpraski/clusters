@@ -25,6 +25,9 @@ type kmeansEstimator struct {
 	d [][]float64
 }
 
+// Implementation of cluster number estimator using gap statistic
+// ("Estimating the number of clusters in a data set via the gap statistic", Tibshirani et al.) with k-means++ as
+// clustering algorithm
 func KMeansEstimator(iterations, clusters int, distance DistanceFunc) (Estimator, error) {
 	if iterations < 1 {
 		return nil, ErrZeroIterations

@@ -8,10 +8,6 @@ import (
 	"strconv"
 )
 
-type Importer interface {
-	Import(file string, start, end int) ([][]float64, error)
-}
-
 type csvImporter struct {
 }
 

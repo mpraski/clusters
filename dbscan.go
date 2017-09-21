@@ -29,7 +29,8 @@ type dbscanClusterer struct {
 	d [][]float64
 }
 
-/* Implementation of DBSCAN algorithm with concurrent nearest neighbour computation */
+// Implementation of DBSCAN algorithm with concurrent nearest neighbour computation. The number of goroutines acting concurrently
+// is controlled via workers argument. Passing 0 will result in this number being chosen arbitrarily.
 func DBSCAN(minpts int, eps float64, workers int, distance DistanceFunc) (HardClusterer, error) {
 	if minpts < 1 {
 		return nil, ErrZeroMinpts

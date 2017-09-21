@@ -1,65 +1,79 @@
+// Package clusters provides abstract definitions of clusterers as well as
+// their implementations.
 package clusters
 
 import (
 	"math"
 )
 
+// DistanceFunc represents a function for measuring distance
+// between n-dimensional vectors.
 type DistanceFunc func(a, b []float64) float64
 
+// Online represents parameters important for online learning in
+// clustering algorithms.
 type Online struct {
 	Alpha     float64
 	Dimension int
 }
 
-/* Events represent intermediate results of computation of both kinds of algorithms
- * transmitted periodically to the caller */
+// HCEvent represents the intermediate result of computation of hard clustering algorithm
+// and are transmitted periodically to the caller during online learning
 type HCEvent struct {
 	Cluster     int
 	Observation []float64
 }
 
-/* TestResult represents output of a test performed to measure quality of an algorithm. */
-type TestResult struct {
-	clusters, expected int
-}
-
-/* Clusterer denotes the operation of learning
- * common for both Hard and Soft clusterers */
+// Clusterer defines the operation of learning
+// common for all algorithms
 type Clusterer interface {
 	Learn([][]float64) error
 }
 
-/* HardClusterer defines a set of operations for hard clustering algorithms */
+// HardClusterer defines a set of operations for hard clustering algorithms
 type HardClusterer interface {
 
-	/* Returns sizes of respective clusters */
+	// Sizes returns sizes of respective clusters
 	Sizes() []int
 
-	/* Returns mapping from data point indices to cluster index. Cluster indices begin at 1, not 0. */
+	// Guesses returns mapping from data point indices to cluster numbers. Clusters' numbering begins at 1.
 	Guesses() []int
 
-	/* Returns index of cluster to which the observation was assigned */
+	// Predict returns number of cluster to which the observation would be assigned
 	Predict(observation []float64) int
 
-	/* Whether algorithm supports online learning */
+	// IsOnline tells the algorithm supports online learning
 	IsOnline() bool
 
-	/* Allows to configure the algorithms for online learning */
+	// WithOnline configures the algorithms for online learning with given parameters
 	WithOnline(Online) HardClusterer
 
-	/* Provides a method to train the algorithm online and receive intermediate results of computation */
+	// Online begins the process of online training of an algorithm. Observations are sent on the observations channel,
+	// once no more are expected an empty struct needs to be sent on done channel. Caller receives intermediate results of computation via
+	// the returned channel.
 	Online(observations chan []float64, done chan struct{}) chan *HCEvent
 
+	// Implement common operation
 	Clusterer
 }
 
+// Estimator defines a computation used to determine an optimal number of clusters in the dataset
 type Estimator interface {
 
-	/* Estimates the numer of clusters */
+	// Estimate provides an expected number of clusters in the dataset
 	Estimate([][]float64) (int, error)
 }
 
+// Importer defines an operation of importing the dataset from an external file
+type Importer interface {
+
+	// Import fetches the data from a file, start and end arguments allow user
+	// to specify the span of data columns to be imported (inclusively)
+	Import(file string, start, end int) ([][]float64, error)
+}
+
 var (
+	// EuclideanDistance is one of the common distance measurement
 	EuclideanDistance = func(a, b []float64) float64 {
 		var (
 			s, t float64
@@ -73,6 +87,7 @@ var (
 		return math.Sqrt(s)
 	}
 
+	// EuclideanDistanceSquared is one of the common distance measurement
 	EuclideanDistanceSquared = func(a, b []float64) float64 {
 		var (
 			s, t float64
