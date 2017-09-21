@@ -18,11 +18,6 @@ type HCEvent struct {
 	Observation []float64
 }
 
-type SCEvent struct {
-	Probabilities []float64
-	Observation   []float64
-}
-
 /* TestResult represents output of a test performed to measure quality of an algorithm. */
 type TestResult struct {
 	clusters, expected int
@@ -54,29 +49,6 @@ type HardClusterer interface {
 
 	/* Provides a method to train the algorithm online and receive intermediate results of computation */
 	Online(observations chan []float64, done chan struct{}) chan *HCEvent
-
-	Clusterer
-}
-
-type SoftClusterer interface {
-
-	/* Returns average probabilities of respective clusters */
-	Probabilities() []float64
-
-	/* Returns mapping from data point indices to cluster probabilities */
-	Guesses() [][]float64
-
-	/* Returns probabilities of the observation being assigned to respective clusters */
-	Predict(observation []float64) []float64
-
-	/* Whether algorithm supports online learning */
-	IsOnline() bool
-
-	/* Allows to configure the algorithms for online learning */
-	WithOnline(Online) SoftClusterer
-
-	/* Provides a method to train the algorithm online and receive intermediate results of computation */
-	Online(observations chan []float64, done chan struct{}) chan *SCEvent
 
 	Clusterer
 }
