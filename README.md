@@ -6,7 +6,7 @@ Go implementations of several clustering algoritms (k-means++, DBSCAN, OPTICS), 
 
 ## The reason
 
-This library was built out of a necessity for a performant and simple clustering utility for Golang. Go, thanks to its several advantages (single binary distrubution, relative performance, growing community) seems to become an attractive alternative to languages commonly used in statistical computations and machine learning. I use the [*floats* package](https://github.com/gonum/gonum/tree/master/floats) from the robust Gonum library to perform optimized vector calculations in tight loops.
+This library was built out of necessity for a performant and simple cluster analysis utility for Golang. Go, thanks to its numerous advantages (single binary distrubution, relative performance, growing community) seems to become an attractive alternative to languages commonly used in statistical computations and machine learning, yet it still lacks crucial tools and libraries. I use the [*floats* package](https://github.com/gonum/gonum/tree/master/floats) from the robust Gonum library to perform optimized vector calculations in tight loops.
 
 ## Install
 
