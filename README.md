@@ -6,7 +6,7 @@ Go implementations of several clustering algoritms (k-means++, DBSCAN, OPTICS), 
 
 ## The reason
 
-This library was built out of a necessity for a performant and simple clustering utility for Golang. Go, thanks to its several advantages (single binary distrubution, relative performance, growing community) seems to become an attractive alternative to languages commonly used in statistical computations and machine learning. I use part of the robust gonum package to perform optimized vector calculations in tight loops.
+This library was built out of necessity for a collection of performant cluster analysis utilities for Golang. Go, thanks to its numerous advantages (single binary distrubution, relative performance, growing community) seems to become an attractive alternative to languages commonly used in statistical computations and machine learning, yet it still lacks crucial tools and libraries. I use the [*floats* package](https://github.com/gonum/gonum/tree/master/floats) from the robust Gonum library to perform optimized vector calculations in tight loops.
 
 ## Install
 
@@ -24,7 +24,8 @@ var data [][]float64
 var observation []float64
 
 // Create a new KMeans++ clusterer with 1000 iterations, 
-// 8 clusters and default distance measurement function of type func([]float64, []float64) float64)
+// 8 clusters and a distance measurement function of type func([]float64, []float64) float64).
+// Pass nil to use clusters.EuclideanDistance
 c, e := clusters.KMeans(1000, 8, clusters.EuclideanDistance)
 if e != nil {
 	panic(e)
@@ -35,7 +36,7 @@ if e = c.Learn(data); e != nil {
 	panic(e)
 }
 
-fmt.Printf("Clustered data set into %d\n", c3.Sizes())
+fmt.Printf("Clustered data set into %d\n", c.Sizes())
 
 fmt.Printf("Assigned observation %v to cluster %d\n", observation, c.Predict(observation))
 
@@ -100,7 +101,7 @@ if e != nil {
 	panic(e)
 }
 
-r, e := c.Estimate(d)
+r, e := c.Estimate(data)
 if e != nil {
 	panic(e)
 }
@@ -109,7 +110,7 @@ fmt.Printf("Estimated number of clusters: %d\n", r)
 
 ```
 
-The library also provides an Importer to load data from files (currently the CSV importer is implemented):
+The library also provides an Importer to load data from file (as of now the CSV importer is implemented):
 
 ```go
 // Import first three columns from data.csv
